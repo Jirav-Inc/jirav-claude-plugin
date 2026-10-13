@@ -50,6 +50,8 @@ Updates arrive when Jirav publishes a new version (each release is listed under 
 
 ## Data and privacy
 
+- **How it works:** operating-jirav includes a small JavaScript helper that Claude runs in your Jirav
+  browser tab. It reads the page and calls Jirav's own API on the same site, and nothing else.
 - **Where data goes:** only to Jirav (app.jirav.com and its API), in your own signed-in browser session.
   The plugin has no connectors, servers or other outside services of its own.
 - **What it reads:** whatever your Jirav login can see, which can include personal data such as staff
