@@ -64,7 +64,8 @@ Updates arrive when Jirav publishes a new version (each release is listed under 
 
 ## Support and license
 
-Questions or problems: contact Jirav support.
+Questions or problems: [Jirav support portal](https://help.jirav.com/support-portal). How Jirav itself works:
+[Jirav help center](https://help.jirav.com).
 
 Copyright © 2026 Jirav Inc. For use with Jirav, under the Jirav End User Agreement you accepted in
 the app. See [LICENSE](LICENSE).
