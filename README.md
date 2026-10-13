@@ -58,6 +58,7 @@ Updates arrive when Jirav publishes a new version (each release is listed under 
   are saved in your Jirav account and kept under your agreement with Jirav.
 - **What it stores:** nothing outside Jirav. The only thing kept in your browser is the plugin's own
   script, so it doesn't reload on every page.
+- **Privacy:** [Jirav Privacy Policy](https://www.jirav.com/privacy-policy).
 
 ## Support and license
 

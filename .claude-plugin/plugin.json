@@ -1,12 +1,13 @@
 {
   "name": "jirav",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Work in the Jirav FP&A app through Claude: find companies, open dashboards, reports and plans directly, read numbers as structured data, and make safe, verified edits to plans, drivers and custom tables.",
   "author": {
     "name": "Jirav Inc.",
     "url": "https://www.jirav.com"
   },
   "homepage": "https://www.jirav.com",
+  "privacyPolicyUrl": "https://www.jirav.com/privacy-policy",
   "keywords": [
     "jirav",
     "fp&a",
