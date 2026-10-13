@@ -48,6 +48,17 @@ Updates arrive when Jirav publishes a new version (each release is listed under 
   department. It keeps payroll from being counted twice when your staff roster already drives salaries,
   leaves Balance Sheet balances intact, asks before uploading and checks the result.
 
+## Data and privacy
+
+- **Where data goes:** only to Jirav (app.jirav.com and its API), in your own signed-in browser session.
+  The plugin has no connectors, servers or other outside services of its own.
+- **What it reads:** whatever your Jirav login can see, which can include personal data such as staff
+  names and salaries, and Jirav users' names and emails.
+- **What it writes:** only the changes you approve (plan values, drivers, custom tables, imports). They
+  are saved in your Jirav account and kept under your agreement with Jirav.
+- **What it stores:** nothing outside Jirav. The only thing kept in your browser is the plugin's own
+  script, so it doesn't reload on every page.
+
 ## Support and license
 
 Questions or problems: contact Jirav support.
