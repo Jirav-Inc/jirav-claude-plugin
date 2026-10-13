@@ -1,0 +1,14 @@
+{
+  "name": "jirav",
+  "owner": {
+    "name": "Jirav Inc."
+  },
+  "description": "Jirav's official plugin for Claude: work in the Jirav FP&A app.",
+  "plugins": [
+    {
+      "name": "jirav",
+      "source": "./",
+      "description": "Work in the Jirav FP&A app through Claude: find companies, open dashboards, reports and plans directly, read numbers as structured data, and make safe, verified edits."
+    }
+  ]
+}
