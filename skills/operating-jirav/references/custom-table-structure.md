@@ -4,8 +4,11 @@
 or **⋮ → Edit Custom Table** next to a table's title in a plan. Changes apply to the table in
 **every plan**. Values are per plan: [custom-table-values.md](custom-table-values.md).
 
-Confirm with the user before you save. The URL's `<name>` is lowercased and triple URL-encoded
-(`my%252520table`), so clicking the table in the sidebar is easier.
+Confirm with the user before you save. **Open a table with `await ct.open(name)`** (helpers below),
+never a hand-built URL: the URL's `<name>` is lowercased and triple URL-encoded
+(`my%252520table`), and **any other form silently opens the first table** (a near name, other case,
+single encoding). `/setup/custom-tables` without the trailing slash lands on the dashboard.
+**Before any edit, check `ct.active()` is the table you mean.**
 
 **Deleting a table orphans its global drivers.** They stay, marked "Invalid Entry", and
 `misconfigured: true` in `jirav.listGlobalDrivers()`. The delete dialog doesn't warn about this,
@@ -17,11 +20,13 @@ It only reads and locates; you do the clicks.
 | Helper | Returns |
 |---|---|
 | `await ct.tables()` | sidebar tables `{name, id, active, menu:{x,y}}` |
+| `await ct.open(name)` | opens the editor on that table and checks it: `{ok, active, id}`, or `{ok: false, why}`, or throws listing the tables |
+| `ct.active()` | name of the table open in the editor |
 | `await ct.openTableMenu(name)` | opens that table's ⋮ (shadow DOM) and returns its items with coordinates |
 | `ct.rows()` / `ct.row(name)` | rows in screen order `{name, type, depth, section, moving, menu:{x,y}}` |
 | `jirav.menu()` | items of whatever menu or dropdown is open, with coordinates |
 | `ct.moving()` | the row in Move mode |
-| `ct.pending()` | `{pending, save:{x,y}, cancel:{x,y}}`, the SAVE CHANGES bar |
+| `ct.pending()` | `{pending, blocked, reason?, save:{x,y}, cancel:{x,y}}`, the SAVE CHANGES bar; `blocked`: SAVE is disabled |
 | `await ct.structure()` | the saved structure of the open table (API) |
 | `await ct.move(name, target, {where})` | drag a row in Move mode (the one gesture) |
 
@@ -38,7 +43,7 @@ focused the button: click once more.
 - **Blank row:** `{separator:{id}}`
 
 List order is sidebar order. Line IDs stay the same through moves and indent changes, so the
-line's values stay attached.
+line's values stay attached. **A Row Type change does not keep them** (see Row fields).
 
 ## Tables (left sidebar)
 
@@ -93,6 +98,13 @@ you pick an item.
 | Color | Revenue, Assets, CMRR / Billings, COGS, OpEx, Other Expenses / Liabilities, Gross Margin, Headcount / Operating Income, Net Income, Bookings / Equity, Custom 1–3 |
 | Allow Import | YES / NO: whether the row accepts Google Sheets or Excel imports |
 
+**Never change a saved row's Row Type.** Changing it, even to Section and straight back to New
+Line, gives the row a **new ID** on SAVE CHANGES (`3rg7xy` → `kmfy4k`) and its values are gone, with
+no warning (tested in one plan; values hang on the ID, which every plan shares). Drivers or
+references using the old ID weren't tested: assume they break. To restructure, add a new row
+instead. If the user really wants the type changed, tell them
+the values go, get an explicit yes, and compare IDs in `ct.structure()` before and after.
+
 Period Value decides how months roll up into quarters and years. Formula Based aggregates a
 driver's inputs first and then applies its formula; use it for ratios. A **Reference** row
 pulls live values instead. Its picker has:
@@ -100,6 +112,22 @@ pulls live values instead. Its picker has:
 - **Category:** Income Statement, Balance Sheet, Staffing, Custom Tables or KPI Library
 - **Department** and **Account**
 - **Include sub-accounts / lines:** 0–4 levels
+
+## Section rules
+
+What a section totals has to match. Tested on a section with a Subtotal:
+
+| Under one section | Result |
+|---|---|
+| Lines with different **Period Value** (Sum + Ending Balance) | Saves with no warning; the section row turns **red** in the plan |
+| A **Reference** whose format or Period Value differs from the lines (a Headcount # reference among Number lines) | Saves with no warning; section row **red** |
+| Lines at the same level with different **Format** (Number + Money) | Both Format fields go red and **SAVE CHANGES is disabled** ("Fill required cells or fix invalid rows") |
+| A **nested** section whose lines have another Format (Money under Number lines) | Saves, **no red row**: the outer total silently adds $ and # |
+
+So keep every line, reference and nested section under a section to one Format and one Period
+Value: check the rows you're adding against the section before saving. After saving, open the table in a plan
+(`/plan/x/<planId>/custom/<customTableId>`) and look at it: a red section row is a failure.
+In the plan grid a Reference row is labelled with its department (e.g. "All"), not its name.
 
 ## Reordering rows: Move + `ct.move`
 
@@ -122,6 +150,10 @@ await ct.move('Line C', 'Line A', { where: 'before' })   // or 'after'
 Row changes are batched behind **SAVE CHANGES / Cancel** at the bottom. Nothing is stored until
 you click SAVE CHANGES, and Cancel discards the whole batch. Table actions (create, rename,
 reorder, delete) and Copy to Table skip this and save at once.
+
+If SAVE CHANGES is disabled, `ct.pending()` returns `blocked: true` and the button's tooltip as
+`reason`: "Fill required cells or fix invalid rows" means a red field (often a Format mismatch, see
+Section rules). Fix it; don't click a blocked SAVE.
 
 Verify with the GET above, and open the table in a plan (`/plan/x/<planId>/custom/<customTableId>`).
 There, section rows show their totals and Reference rows show live values.

@@ -31,10 +31,21 @@ await jirav.listReportSources()         // [{id, name, type, planId?, pointsTo?,
   `compareTo` includes its relative range, e.g. `Actuals (previous year)` or `Plan (year total)`; `percentOf` is the % column basis; `departments` is `all` or the
   filtered list. `jirav.page().reportSlug` is the URL slug, not an id: match `listReports()` by name.
   A source shown as `… (missing: deleted plan?)` means the page points at a plan that's gone: flag it.
+- **What a Δ means:** `variance.formula` gives each group's Δ per section, e.g. `revenue: {delta:
+  'Actuals − 2026 Budget', percentOf: 'Actuals'}`, `expense: {delta: '2026 Budget − Actuals'}`.
+  Revenue rows are Revenue, margins and income lines; everything else is expense. The formula can
+  differ between sections and between groups on one page (one BvA page had expense Δ = Budget −
+  Actuals for the month and Actuals − Budget for YTD). Say which way a Δ runs before calling it
+  over or under, and never judge from the sign or colour alone
+  ([variance-and-cash-flow-settings.md](variance-and-cash-flow-settings.md)).
 - Values: open the page and use `jirav.readGridValues()`. Columns carry `columnSources`
-  (Actuals vs plan) and `Δ` variance columns have no source.
+  (Actuals vs plan); Δ, % and "% of" columns have kinds `variance`, `variancePercent`,
+  `percentOf`. Rows are `section` / `subtotal` / `line`: take totals by label, never by summing a
+  depth ([reading-grid-values.md](reading-grid-values.md)).
 - **Picking "the latest" report:** filter by `status` (e.g. `PUBLISHED` for a closed month-end
-  pack), then take the newest `lastUpdateTime`. Publish names default to `<package> <Mon YY>` of
+  pack), then take the newest `lastUpdateTime` among packages named like the one the user means
+  (`<package> <Mon YY>`): skip test or scratch packages ("Test", "ZZ …", "… 1" clones), and say
+  which you used. Publish names default to `<package> <Mon YY>` of
   the day it was published, so "Mar 26" often has February as its last actual month. Check
   `jirav.getPeriods().closeMonth` and the last `actual` column.
 - Pages whose columns don't fit the question (e.g. months only, or quarter-to-date only): a published

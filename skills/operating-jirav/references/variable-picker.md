@@ -14,6 +14,7 @@ drivers ([staffing.md](staffing.md)), Variance Rules, Goals and report lines.
     for every account and department the driver is applied to.
   - **Time Options → Range.** The Ranges picker; see [date-ranges.md](date-ranges.md). A
     multi-month range adds **Reduction**: Sum (default), Min, Max, Product, Average, Standard
-    Deviation, Variance. "Trailing 3 months" is the 3 months *before* the current one.
+    Deviation, Variance. "Trailing 3 months" is the 3 months *before* the current calendar month, so it
+    can be forecast months; for actuals use a Close-Month range ([date-ranges.md](date-ranges.md#today-vs-the-close-month)).
   - **Data Preview.** The values the input will return. Check it before SELECT.
 - An assumption needs no options: pick it, then SAVE. A Constant takes a typed value.

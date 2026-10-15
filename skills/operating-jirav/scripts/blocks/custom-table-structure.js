@@ -4,11 +4,13 @@
 //
 // Read-only: these find rows and return click coordinates; Claude does the clicking and Save.
 //   ct.tables()                -> [{name, id, active, menu:{x,y}}]   sidebar tables, ⋮ position
+//   ct.open(name)              -> {ok, active, id} | {ok:false, active, why}   opens the editor on that table and checks it
+//   ct.active()                -> name of the table open in the editor
 //   ct.openTableMenu(name)     -> [{label, x, y}]   opens a table's ⋮ (shadow DOM) and lists its items
 //   ct.rows()                  -> [{name, type, depth, section, moving, menu:{x,y}}]   rows in screen order
 //   ct.row(name)               -> one row (throws if missing or ambiguous)
 //   ct.moving()                -> name of the row in Move mode, or null
-//   ct.pending()               -> {pending, save:{x,y}, cancel:{x,y}}   the SAVE CHANGES bar
+//   ct.pending()               -> {pending, blocked, reason?, save:{x,y}, cancel:{x,y}}   the SAVE CHANGES bar; blocked = SAVE disabled
 //   ct.structure()             -> the saved structure of the open table (API), as a nested list
 //   ct.move(name, target, {where:'before'|'after'})   drag a row that is in Move mode (the one gesture)
 if (typeof jirav === 'undefined') throw new Error('Paste scripts/jirav.min.js (the core) first.');
@@ -24,6 +26,23 @@ jirav.block('customTableStructure', 'dev', (jirav) => {
       const name = clean(it.textContent), btn = it.querySelector('.dropdown-button-container');
       return { name, id: ids[name] || null, active: it.classList.contains('m-active'), menu: btn ? jirav.at(btn) : null };
     });
+  };
+  // The editor URL takes the name lowercased and triple URL-encoded; anything else silently opens the
+  // FIRST table. open() builds it from the real name and checks which table is active before returning.
+  const active = () => { onPage(); const it = sidebarItems().find(i => i.classList.contains('m-active')); return it ? clean(it.textContent) : null; };
+  const open = async name => {
+    const all = await jirav.listCustomTables();
+    const t = all.find(x => x.name === name) || all.filter(x => x.name.toLowerCase() === String(name).toLowerCase())[0];
+    if (!t) throw new Error(`No custom table "${name}". Tables: ${all.map(x => x.name).join(', ')}`);
+    const enc = [0, 1, 2].reduce(v => encodeURIComponent(v), t.name.toLowerCase());
+    await jirav.go(`/${location.pathname.split('/')[1]}/setup/custom-tables/${enc}`);
+    for (let i = 0; i < 40; i++) {
+      const a = /\/setup\/custom-tables/.test(location.pathname) && active();
+      if (a === t.name) return { ok: true, active: a, id: t.id };
+      await new Promise(r => setTimeout(r, 250));
+    }
+    const a = /\/setup\/custom-tables/.test(location.pathname) ? active() : null;
+    return { ok: false, active: a, why: `Asked for "${t.name}" but "${a}" is open: don't edit; click "${t.name}" in the sidebar.` };
   };
   const openTableMenu = async name => {
     onPage();
@@ -70,7 +89,10 @@ jirav.block('customTableStructure', 'dev', (jirav) => {
     const shown = b => { const r = b.getBoundingClientRect(); return r.height > 0 && r.top < innerHeight && getComputedStyle(b).visibility !== 'hidden'; };
     const btn = t => [...document.querySelectorAll('button, a')].find(b => b.textContent.trim().toUpperCase() === t && shown(b));
     const s = btn('SAVE CHANGES'), c = btn('CANCEL');
-    return { pending: !!s && !s.disabled, save: s ? jirav.at(s) : null, cancel: c ? jirav.at(c) : null };
+    // pending: the bar is up; blocked: SAVE CHANGES is disabled (reason = its tooltip), don't click it.
+    const blocked = !!s && !!(s.disabled || s.closest('[disabled]')), tip = s && s.closest('[data-tooltip]');
+    return { pending: !!s, blocked, ...(blocked ? { reason: (tip && tip.getAttribute('data-tooltip')) || null } : {}),
+      save: s ? jirav.at(s) : null, cancel: c ? jirav.at(c) : null };
   };
   const structure = async () => {
     onPage();
@@ -92,5 +114,5 @@ jirav.block('customTableStructure', 'dev', (jirav) => {
     const res = await jirav.drag(r._item, t._item, opts);
     return Object.assign(res, { order: rows().map(x => (x.depth ? '  '.repeat(x.depth) : '') + x.name) });
   };
-  return { tables, openTableMenu, rows, row, moving, pending, structure, move };
+  return { tables, active, open, openTableMenu, rows, row, moving, pending, structure, move };
 }, 'Settings → Custom Tables editor: rows, menus, Save bar, structure, drag a row in Move mode');

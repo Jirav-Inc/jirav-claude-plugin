@@ -9,7 +9,7 @@
 // After a full page load (navigate, reload, switching company) the globals are gone. ONE line
 // restores the core and every block that was loaded in this tab:
 //
-//   location.host !== 'app.jirav.com' ? 'WAIT: on '+location.host+', not app.jirav.com yet: retry in a few seconds' : (typeof jirav !== 'undefined' && jirav.build === 'e5794eed') ? jirav.status() : (localStorage.jiravKit || '').includes("KIT_BUILD='e5794eed'") ? (0, eval)(localStorage.jiravKit) : 'PASTE scripts/jirav.min.js (not cached in this browser, or out of date)'
+//   location.host !== 'app.jirav.com' ? 'WAIT: on '+location.host+', not app.jirav.com yet: retry in a few seconds' : (typeof jirav !== 'undefined' && jirav.build === '928ba45c') ? jirav.status() : (localStorage.jiravKit || '').includes("KIT_BUILD='928ba45c'") ? (0, eval)(localStorage.jiravKit) : 'PASTE scripts/jirav.min.js (not cached in this browser, or out of date)'
 //
 // Blocks add page-specific helpers: one function mounted on jirav, or a namespace when there are several.
 // Paste a block file after the core when jirav.page() suggests it:
@@ -26,7 +26,7 @@
 //   jirav.listDashboards()          [{id, name, position}]          position 1 = default
 //   jirav.listReports()             [{id, name, status, lastUpdateTime}]  newest first
 //   jirav.listReportPages(reportId) [{name, type, hasGrid}]
-//   jirav.listPlans()               [{planId, shortName, type, editable, cutoverDate, ...}]  active plans only
+//   jirav.listPlans()               [{planId, shortName, type, editable, cutoverDate, ..., warning?}]  active plans only; warning: a planId that reads like a name
 //   jirav.listCustomTables()        [{id, name}]
 //   jirav.listPlanDrivers(planId)   [{id, name, type, page, account, department, inputs, misconfigured}]  this plan only;
 //                                   type = the page for formula drivers (revenue, opex…) or the kind (annual_target, capex…)
@@ -43,7 +43,7 @@
 //   jirav.getVarianceRules()        [{line, favorable, valueThreshold, percentThreshold, match, exceptions}]
 //   jirav.getCashFlowSetup()        [{key, name, parent, activity: operating|investing|financing}]  balance sheet → cash flow class
 //   jirav.listReportSources(company?) [{id, name, type, planId?, pointsTo?, dates}]  what report pages/tiles can show (Actuals, plans, Current PoR, Goals)
-//   jirav.getReportSetup(reportId)  [{page, type, template, departments, groups: [{source, range, show, compareTo, thirdSource, variance, percentOf}]}]  per page; compareTo carries its relative range
+//   jirav.getReportSetup(reportId)  [{page, type, template, departments, groups: [{source, range, show, compareTo, thirdSource, variance, percentOf}]}]  per page; compareTo carries its relative range; variance.formula: Δ and % basis per section (revenue / expense)
 //   jirav.listDashboardTiles(dashboardId)  [{id, kind, title, chart, source, compareTo, range, frequency, position}]
 //   jirav.getTileValues(dashboardId, tileId)  {title, periods, rows: [[label, ...values]], overlay?}  a chart tile's numbers
 //   jirav.getDataStatus()          {accounting: {source, company, connected, last…}, workforce, customTables, closeMonth}  where actuals come from, how fresh
@@ -51,7 +51,7 @@
 //   jirav.getAutoForecast(planId?)  {company: {mode, method, departments, accountSettings}, plan?: {enabled}}
 //   jirav.go(path) / jirav.ready()  in-app navigation that keeps the kit loaded; wait for load
 //   jirav.readTableRows(i?)        rows of a plain/Material table (Audit Log, Users) as {header: text}
-//   jirav.saveBar()                 {pending, covered, save:{x,y}, cancel:{x,y}}  the bottom SAVE CHANGES / Cancel bar; covered: an open panel hides it
+//   jirav.saveBar()                 {pending, blocked, reason?, covered, save:{x,y}, cancel:{x,y}}  the bottom SAVE CHANGES / Cancel bar; blocked: SAVE is disabled (reason = its tooltip), don't click; covered: an open panel hides it
 //   jirav.alerts({since})           [{kind: success|info|warning|error, text, at}]  every alert seen (success/info auto-close after 4 s)
 //   jirav.dismissAlerts()           close the alerts on screen (after reading warnings/errors); jirav.autoDismiss(false) to keep them
 //   jirav.waitIdle() / jirav.busy() wait out / detect the "Applying changes…" recalculation overlay (after every Save)
@@ -109,10 +109,19 @@ var jirav = (() => {
   const listReportPages = async (reportId, company) => (await api(`/v2/reportPackages/package/${reportId}/elements`, company))
     .flatMap(s => s.reports || []).filter(p => p.type !== 'area')
     .map(p => ({ name: p.reportName, type: p.type, hasGrid: p.type === 'reportWithSources' }));
-  const listPlans = async (company) => (await api('/v1/model/plans', company)).map(p => ({
-    planId: p.planId, shortName: p.shortName, name: p.name, type: p.type, editable: p.editable,
-    archived: p.archived, startDate: p.startDate, cutoverDate: p.cutoverDate, endDate: p.endDate, currency: p.currency,
-    updateTime: p.contentUpdateTime || p.updateTime }));
+  // planIds are opaque, but a company's first plan often has the planId "Budget" whatever it's called
+  // now, sometimes next to a different plan named Budget. Flag a planId that reads like a plan name.
+  const listPlans = async (company) => {
+    const ps = await api('/v1/model/plans', company), low = v => String(v || '').trim().toLowerCase();
+    return ps.map(p => {
+      const other = ps.find(q => q !== p && low(q.shortName) === low(p.planId));
+      const warning = other ? `planId "${p.planId}" is NOT the plan named "${other.shortName}" (that one is ${other.planId}): match plans by shortName`
+        : low(p.planId) !== low(p.shortName) && /^[a-z]/i.test(p.planId) && /[A-Z]/.test(p.planId) ? `planId "${p.planId}" is an id, not this plan's name ("${p.shortName}")` : null;
+      return { planId: p.planId, shortName: p.shortName, name: p.name, type: p.type, editable: p.editable,
+        archived: p.archived, startDate: p.startDate, cutoverDate: p.cutoverDate, endDate: p.endDate, currency: p.currency,
+        updateTime: p.contentUpdateTime || p.updateTime, ...(warning ? { warning } : {}) };
+    });
+  };
   const listCustomTables = async (company) => (await api('/v1/customTable', company))
     .map(t => ({ id: t.customTableConfig.customTableId, name: t.customTableConfig.name }));
   // Plan drivers: stored in one plan. Global drivers are NOT included (see listGlobalDrivers).
@@ -216,6 +225,16 @@ var jirav = (() => {
       const ids = ((f.custom || {}).selections || []).map(x => ((x.filter || {}).filter || {}).SingleElement).filter(Boolean);
       return ids.length ? ids.map(id => (deps.find(y => y.id === id.elementId) || {}).name || id.elementId) : 'all'; };
     const src = id => { if (!id) return null; const x = sources.find(y => y.id === id); return x ? (x.shortName || x.name) : id + ' (missing: deleted plan?)'; };
+    // Δ = minuend − subtrahend, set per section (REVENUE rows: Revenue, margins, income lines; EXPENSE:
+    // everything else), so the sign of a Δ can mean opposite things on one page. % divides by `divisor`.
+    const deltaFormula = (v, b) => {
+      const side = x => x === 'COMPARE_TO' ? src(b.compareTo) : x === 'THIRD_SOURCE' ? src(b.thirdSource) : src(b.source);
+      const f = Object.entries(v.formulaBySection || {});
+      if (!f.length) return {};
+      return { formula: Object.fromEntries(f.map(([sec, c]) => [sec.toLowerCase(), {
+        delta: c.number ? `${side(c.number.minuend)} − ${side(c.number.subtrahend)}` : null,
+        percentOf: c.percent && c.percent.divisor ? side(c.percent.divisor) : null }])) };
+    };
     const rng = r => { if (!r || !r.rangeId) return null; const x = ranges.find(y => y.id === r.rangeId); return x ? x.name : r.rangeId; };
     return els.flatMap(sec => sec.reports || []).filter(p => p.type !== 'area').map(p => {
       const out = { page: p.reportName, type: p.type, template: p.reportType || null };
@@ -232,7 +251,7 @@ var jirav = (() => {
           show: Object.entries(b.periodicColumns || {}).filter(([, on]) => on).map(([k]) => k),
           compareTo: b.compareToEnabled ? `${src(b.compareTo)} (${shift(v && v.shift)})` : null,
           thirdSource: b.thirdSourceEnabled ? `${src(b.thirdSource)} (${shift(v && v.shiftThirdSource)})` : null,
-          variance: v ? { number: !v.numberFormulaHidden, percent: !v.percentFormulaHidden } : null,
+          variance: v ? { number: !v.numberFormulaHidden, percent: !v.percentFormulaHidden, ...deltaFormula(v, b) } : null,
           percentOf: ((Object.values(g.reportTypeSpecificGroupConfig || {})[0] || {}).percentOfReferenceType || 'NONE').replace('NONE', '') || null };
       });
       return out;
@@ -334,7 +353,13 @@ var jirav = (() => {
     const r = save.getBoundingClientRect(), top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
     const within = (outer, el) => { for (let n = el; n; n = n.parentNode || n.host) if (n === outer) return true; return false; };
     const covered = !!top && !within(save, top) && !within(top, save);
-    return { pending: true, covered, save: at(save), cancel: cancel ? at(cancel) : null };
+    // A disabled SAVE (invalid or missing fields) is blocked: clicking it does nothing. Jirav puts
+    // the reason in data-tooltip, e.g. "Fill required cells or fix invalid rows".
+    const off = n => n && (n.disabled || n.getAttribute('aria-disabled') === 'true');
+    const holder = save.closest('[data-tooltip]');
+    const blocked = !!(off(save) || save.closest('[disabled]'));
+    return { pending: true, blocked, ...(blocked ? { reason: (holder && holder.getAttribute('data-tooltip')) || null } : {}),
+      covered, save: at(save), cancel: cancel ? at(cancel) : null };
   };
   // Jirav's alerts (green/red boxes at the top) pile up. The kit logs every alert it sees, closes
   // success/info ones after 4 s, and leaves warnings/errors until read and dismissed.

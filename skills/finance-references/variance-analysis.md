@@ -41,6 +41,6 @@ Seen in real company data:
   loaded (`operating-jirav` → company-settings, integrations).
 - Actuals that repeat earlier months exactly (sample or duplicated data, such as a
   short loop of months repeating); say it once.
-- `misconfigured` drivers on the plan (Auto-Forecast overriding them, or broken inputs).
+- `misconfigured` drivers on the plan (Auto-Forecast hiding them, or broken inputs).
 - A report source labelled "Deleted Plan".
 

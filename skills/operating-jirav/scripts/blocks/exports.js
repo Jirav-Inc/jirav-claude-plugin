@@ -7,13 +7,15 @@
 // user's Downloads. It never changes anything in Jirav.
 //   ex.capture()                 -> 'capturing'   turn on BEFORE clicking Export; stays on (re-armed by the restore
 //                                   line after a reload) until release(). Files caught before a reload are lost.
-//   ex.wait(ms?)                 -> {i, name, size, ...}   call right after the Export click: waits for the file
+//   ex.wait(ms?)                 -> {i, name, size, ...}   call right after the Export click: the first file caught since
+//                                   the last wait() returned one; {timedOut} if none comes
 //   ex.list()                    -> [{i, name, size, type, at}]   files caught so far, newest last
 //   ex.readXlsx(i?, {formulas})  -> {name, sheets: [{name, rows: [[...cells]], formulaCells}]}   parse an Excel export in place
 //   ex.readBase64(i?, {offset, length})  -> {name, size, offset, length, done, base64}   raw bytes, in chunks,
 //                                   to move the file into Claude's workspace (references/exports.md)
 //   ex.release()                 -> 'released'    normal downloads again
-// i defaults to the newest file.
+// i defaults to the newest file, except after a timed-out wait(): then readXlsx/readBase64 need an explicit i, so an
+// older file is never read as if it were the new export.
 if (typeof jirav === 'undefined') throw new Error('Paste scripts/jirav.min.js (the core) first.');
 jirav.block('exports', 'dev', (jirav) => {
   const st = window.__jiravExports = window.__jiravExports || { files: [], blobs: new Map(), on: false, orig: null };
@@ -38,17 +40,19 @@ jirav.block('exports', 'dev', (jirav) => {
     st.on = false; try { sessionStorage.removeItem('jiravExportsCapture'); } catch (e) {}
     return 'released';
   };
-  const wait = async (timeoutMs = 20000) => {     // after clicking Export: the newest file caught in the last 10 s, or the next one
-    const since = new Date(Date.now() - 10000).toISOString(), t0 = Date.now();
+  const wait = async (timeoutMs = 20000) => {     // after clicking Export: the first file caught since the last wait() returned one
+    const from = (st.seen == null ? -1 : st.seen) + 1, t0 = Date.now();
     while (Date.now() - t0 < timeoutMs) {
-      const k = st.files.findIndex(f => f.at >= since); if (k >= 0) return list()[st.files.length - 1];
+      if (st.files.length > from) { st.seen = st.files.length - 1; st.stale = false; return list()[st.seen]; }
       await new Promise(r => setTimeout(r, 300));
     }
-    return { timedOut: true, note: st.on ? 'No file caught: check the Export finished (a package PDF takes up to ~15 s).' : 'Capture is off: call capture() before exporting.' };
+    st.stale = true;                              // until a wait() succeeds, reads need an explicit index
+    return { timedOut: true, note: (st.on ? 'No new file caught: check the Export finished (a package PDF takes up to ~15 s), or export again.' : 'Capture is off: call capture() before exporting.') + ' readXlsx()/readBase64() without an index refuse until a wait() returns a file.' };
   };
   const list = () => st.files.map((f, i) => ({ i, name: f.name, size: f.size, type: f.type, at: f.at }));
   const pick = i => {
     if (!st.files.length) throw new Error(st.on ? 'Nothing caught yet: click Export, wait for it to finish, then list().' : 'Capture is off: call capture() before exporting.');
+    if (i == null && st.stale) throw new Error('The last wait() timed out, so there is no new file: export again and wait(), or pass an index from list() if you are sure which file you want.');
     const f = st.files[i == null ? st.files.length - 1 : i];
     if (!f) throw new Error(`No file ${i}; list() shows 0..${st.files.length - 1}.`);
     return f;

@@ -21,7 +21,7 @@ The page `/<tenant>/plan/x/<planId>/staffing` has four grids, readable with
 
 | grid | Section | Rows |
 |---|---|---|
-| 0 | **Headcount** by month | All → department → role → Imported Staff / Planned Hire / Driver → person |
+| 0 | **Headcount** by month | All → department → role → Imported Staff / Planned Hire / Driver. A person's row has `label` Imported Staff (or Planned Hire) and the name in `attrs['Full Name']` |
 | 1 | **Salaries** by month (monthly cost) | same tree |
 | 2 | **Manage Staff** | one row per person: Department, Role, Full Name, Hire Date, Annual Wages, Term Date |
 | 3 | **Driver Based Hires** | one row per staffing driver (settings, no monthly values) |
@@ -36,7 +36,7 @@ until SAVE CHANGES** at the bottom (Cancel discards).
 
 | Change | How |
 |---|---|
-| Add a planned hire | **Add Planned Hire** (or row ⋯ → Add / Clone Planned Hire). A new row "TBH" appears at the bottom of the grid: double-click Department (list), select Role and press Enter (list of existing roles), double-click Hire Date and type `YYYY-MM-DD` + Enter, double-click Annual Wages, type, Enter. Full Name can stay "TBH". SAVE CHANGES |
+| Add a planned hire | **Add Planned Hire** (or row ⋯ → Add / Clone Planned Hire). A new row "TBH" appears at the bottom of the grid: double-click Department (list), select Role and press Enter (list of existing roles; it also takes free text, so reuse an existing role unless asked), double-click Hire Date and type `YYYY-MM-DD` + Enter, double-click Annual Wages, type the **full number** (`90000`: "90k" is stored as 90, silently), Enter. Full Name can stay "TBH". SAVE CHANGES |
 | Raise | Row ⋯ → **Plan Raise**: date, then $ per year **or** % of base salary → Add → Save in the dialog → **SAVE CHANGES** on the page. Also offered on imported staff (not tested there) |
 | End someone's employment | Double-click **Term Date** (any row), type the date, Enter, SAVE CHANGES |
 | Delete a planned hire | Row ⋯ → Delete Planned Hire, SAVE CHANGES. Imported staff can't be deleted or have their name, role, hire date or wages edited |
@@ -52,6 +52,16 @@ After saving, re-read `listStaff` and the headcount / salaries rows for the affe
 1,000 a month from the raise date).
 
 ## Gotchas
+
+- **Hire Date must be a forecast month.** A date in an actual month is accepted in the cell, but
+  SAVE CHANGES stays disabled with no message (`jirav.saveBar().blocked`). For "March", use the
+  first March on or after the plan's first forecast month (`getPeriods`) and say which year.
+- **A Term Date before the Hire Date is accepted** (SAVE stays enabled): check it yourself.
+- **After a hire, check OpEx moved** (its System Salaries line for that department). If staffing
+  shows the salary but OpEx doesn't change, check the company's Salary Expenses account (Settings
+  → Plans, [company-settings.md](company-settings.md)): reported as the cause, not tested here.
+- **No staff, but salary actuals:** when `listStaff` is empty, say the staff list isn't loaded
+  rather than answering "0 people".
 
 - **Escape closes the Plan Raise dialog and loses what you typed.**
 - A staffing driver shows 0 headcount when its driver is empty in the forecast (e.g. a plan with no

@@ -20,7 +20,7 @@ Runs on top of the `operating-jirav` skill: use its kit (the restore line, the `
 1. **Target plan.** Use `jirav.listPlans()` and `jirav.getPeriods(planId)`.
    - The forecast window should be the 12 months of the fiscal year being budgeted. If the budget covers only part of the window, fill only those months (blank Income Statement cells change nothing) and say which months stay unbudgeted.
    - The plan must be editable.
-   - Check `getAutoForecast(planId).plan.enabled`. A budget plan normally has Auto-Forecast off, because it overrides drivers, including the wage elimination driver.
+   - Check `getAutoForecast(planId).plan.enabled`. A budget plan normally has Auto-Forecast off: while it's on, it hides typed values and drivers on accounts inside a group (the elimination driver and imported budget values included), adds to them on top-level accounts, and zeroes System Salaries.
 2. **Departments.** Use `jirav.listDepartments()` and `getDepartmentMappings()`. The template has one row per account × master department, so departments must be set before the import.
 3. **Where the prior-year actuals sit.** On each plan page (Revenue, COGS, OpEx, Other), read the prior fiscal year by account, switching the page's Department filter to each department.
    - Revenue, COGS and Other often sit in one department (Unassigned, or wherever the company maps unassigned GL activity); OpEx sits by department. Read where they are; don't assume.
@@ -189,5 +189,5 @@ Report to the user:
 - The Department filter on plan pages persists across plans and sessions. Note it before changing it, and restore it after.
 - Budget each line in the department where its actuals sit, so budget vs actuals lines up.
 - If the roster's department mix differs from the actual wage mix by department, flag it: a department-level budget vs actuals view will show the difference.
-- Auto-Forecast on in the budget plan overrides drivers, including the elimination driver. Keep it off unless the user wants it.
+- Auto-Forecast on in the budget plan hides or adds to the imported values and drivers, the elimination driver included ([plans.md → Auto-Forecast](../operating-jirav/references/plans.md#auto-forecast)). Keep it off unless the user wants it.
 - Driver menus open with a short animation. When scripting clicks, pause about 1 s between opening a menu and clicking an item.

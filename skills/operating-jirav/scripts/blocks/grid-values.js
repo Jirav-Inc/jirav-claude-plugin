@@ -28,7 +28,8 @@ jirav.block('readGridValues', 'dev', (jirav) => {
     const grids = comps.map(c => {
       const api = c.gridApi || c.gos.api;
       const capi = c.columnApi || (c.gos && c.gos.columnApi) || api;
-      const cols = capi.getAllDisplayedColumns();
+      // Some grids (staffing) start with a ⋯ row-menu column: the labels are in the next one.
+      const cols = capi.getAllDisplayedColumns().filter(c => c.getColId() !== 'rowMenu');
       const header = col => capi.getDisplayNameForColumn(col, 'header');
       const groupDef = col => { const p = col.getParent && col.getParent(); return p && (p.getColGroupDef ? p.getColGroupDef() : p.getOriginalColumnGroup && p.getOriginalColumnGroup().getColGroupDef()); };
       const labelCol = cols[0];
@@ -44,7 +45,10 @@ jirav.block('readGridValues', 'dev', (jirav) => {
         const gd = groupDef(col), gm = (gd && gd.metadata) || {};
         const grain = /yearly/i.test(id) ? 'year' : /quarterly/i.test(id) ? 'quarter' : (start === end ? 'month' : 'range');
         const fi = m.forecastIndicator !== undefined ? m.forecastIndicator : gm.forecastIndicator;
-        const kind = tags.includes('forecast') ? 'forecast' : (tags.includes('actuals') || tags.includes('actual')) ? 'actual'
+        // Report Δ / % columns and "% of" columns carry periods too: type them so {kind} filters skip them.
+        const kind = m.variance === 'DELTA' ? 'variance' : m.variance === 'PERCENT' ? 'variancePercent'
+          : pr.PERCENT_OF_REFERENCE === 'true' ? 'percentOf'
+          : tags.includes('forecast') ? 'forecast' : (tags.includes('actuals') || tags.includes('actual')) ? 'actual'
           : (grain === 'month' && typeof fi === 'boolean') ? (fi ? 'forecast' : 'actual') : null;
         return { col, label: header(col), period: start === end ? start : `${start}..${end}`, range: [start, end], grain, kind,
           department: pr.DEP_NAME || null, total: pr.TOTAL_COLUMN === 'true', source: gm.srcId || null, sourceName: gd ? gd.headerName || gm.shortName || null : null };
@@ -84,7 +88,14 @@ jirav.block('readGridValues', 'dev', (jirav) => {
       const rowKind = (n, tags) => {
         if (tags.includes('HEADER_ROW')) return 'header';
         const d = n.data || {};
-        if (d.rowMeta) return 'line';                       // report grid
+        if (d.rowMeta) {                                    // report grid: rows link to parents by key
+          const rm = d.rowMeta, lbl = String(unwrap(api.getValue(labelCol, n)) || '');
+          if (/-subtotal$/i.test(rm.name || '') || /^(sub)?total\b/i.test(lbl)) return 'subtotal';
+          // A section's values total the rows under it: loaded children, or a folded section row
+          // (e.g. "OpEx by Department" in a published pack, shown as one total).
+          if ((n.childrenAfterGroup || []).length || (rm.collapsed && /^section=[A-Z_]+$/.test(rm.name || ''))) return 'section';
+          return 'line';
+        }
         if (tags.includes('DRIVER')) return 'driver';
         if (isAccountNode(n)) return (n.childrenAfterGroup || []).some(isAccountNode) ? 'group' : 'account';
         if (n.level === 0) return 'total';

@@ -11,6 +11,9 @@ through menus, unless a reference says otherwise.
 
 ## Ground rules
 
+- **No browser, no Jirav.** Every task here runs in a browser on app.jirav.com. If you can't control a
+  browser in this session, say so before starting, and suggest Claude Cowork (built-in browser) or Claude
+  with the Claude in Chrome extension.
 - **The user signs in.** Never type credentials. On `signin.jirav.com` (or after a 401/403 from the
   kit), ask the user to sign in in the browser pane. An "OAuth Error" page usually clears if you
   navigate again.
@@ -37,7 +40,7 @@ They don't save: you click, type and Save at the coordinates they return (`jirav
 - **Start every browser call with the restore line.** It reloads the kit cached in this browser
   (across reloads, tabs and sessions) while the files here are unchanged:
   ```js
-  location.host !== 'app.jirav.com' ? 'WAIT: on '+location.host+', not app.jirav.com yet: retry in a few seconds' : (typeof jirav !== 'undefined' && jirav.build === 'e5794eed') ? jirav.status() : (localStorage.jiravKit || '').includes("KIT_BUILD='e5794eed'") ? (0, eval)(localStorage.jiravKit) : 'PASTE scripts/jirav.min.js (not cached in this browser, or out of date)'
+  location.host !== 'app.jirav.com' ? 'WAIT: on '+location.host+', not app.jirav.com yet: retry in a few seconds' : (typeof jirav !== 'undefined' && jirav.build === '928ba45c') ? jirav.status() : (localStorage.jiravKit || '').includes("KIT_BUILD='928ba45c'") ? (0, eval)(localStorage.jiravKit) : 'PASTE scripts/jirav.min.js (not cached in this browser, or out of date)'
   ```
 - **PASTE**: paste the whole of `scripts/jirav.min.js` with `javascript_tool` on any app.jirav.com page (even
   the company picker). `scripts/jirav.js` is the readable, documented source: read it, don't paste it.
@@ -74,8 +77,17 @@ Facts marked *(help)* come from Jirav's help articles and haven't been tested: c
 
 1. **Get the lay of the land.** From what the user asked, work out which surfaces are involved
    (plans, drivers, assumptions, custom tables, reports, dashboards, settings) and read what's
-   there first: existing drivers on the target lines (they add together), whether Auto-Forecast is
-   on (it overrides drivers), and assumptions, ranges and packages you could reuse.
+   there first: existing drivers on the target lines (they add together; one that reads its own
+   line over a past range, like Last Month or a T6M average, grows whatever else you add:
+   `plan-drivers.md`), whether Auto-Forecast is on (it adds to or hides typed values and drivers:
+   `plans.md`), and assumptions, ranges and packages you could reuse. **Never delete or replace
+   an existing driver unless the user asked**; if one conflicts, say so in the proposal.
+   **Never change a saved custom-table row's Row Type**: it deletes the line's values
+   (`custom-table-structure.md`). **"Trailing", "YTD" and averages of history** mean actuals:
+   system ranges follow today, not the close month (`date-ranges.md`).
+   **Recurring words recur**: "annually", "every March", "quarterly" run through the plan's end,
+   never as one dated event. **Before saying a setting doesn't exist**, expand the collapsed
+   sections (Driver Options, More Options) in its dialogs.
 2. **Propose once.** Say what will change, its scope (this plan or company-wide), and any default
    you chose. One yes covers the whole proposal; ask again only if it changes.
 3. **Build** through the Edits steps below.
@@ -97,7 +109,8 @@ Mistakes change a customer's financial model. For every change:
    suggest copying the plan first.
 3. **Change it in the UI** by visible labels or kit coordinates. Most pages batch edits behind a
    bottom **SAVE CHANGES** bar that appears once the edit is committed (Enter, or leaving the field):
-   check `jirav.saveBar()` before Save, and that it's gone after.
+   check `jirav.saveBar()` before Save, and that it's gone after. `blocked: true` means SAVE is
+   disabled: read `reason` (e.g. "Fill required cells or fix invalid rows"), fix it, don't click.
 4. **Wait**: `await jirav.waitIdle()` outlasts the "Applying changes…" overlay. Jirav's messages are in
    `jirav.alerts()`: success ones close themselves; read warnings and errors, then `jirav.dismissAlerts()`.
 5. **Verify**: re-read the values and report old → new.

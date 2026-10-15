@@ -60,7 +60,9 @@ blank and the row would vanish). With several grids on one page the result is an
   - `grains`: month, quarter, year, or range. FY and total columns are **not** months; don't
     add them to monthly sums.
   - `kinds`: `actual` or `forecast` per month column, on plan and report pages. It's `null` for
-    FY, range and total columns.
+    FY, range and total columns. On report pages: `variance` (Δ), `variancePercent` (% next to a
+    Δ, a fraction: −0.11 = −11%) and `percentOf` ("% of Revenue" columns). These carry the same
+    `period` as the value columns beside them, and `{kind: 'actual'|'forecast'}` leaves them out.
   - `departments`: appears when columns are departments (e.g. "Income Statement by Dept").
     The `Total` column is marked. Their `periods` are the full range the page covers.
   - `sources`: the plan(s) or scenario(s) the numbers come from. When columns come from
@@ -73,7 +75,16 @@ blank and the row would vanish). With several grids on one page the result is an
     - `driver`: a driver line under an account (its values are part of the account's).
     - `total`: a top-level computed row, e.g. Gross Profit or Operating Income.
     - `line`: other sub-lines, e.g. System Salaries or Manual Input.
-  - Report pages: `line`, or `header` when headers are included.
+  - Report pages:
+    - `section`: a row whose values total the rows under it ("Revenue", "OpEx by Department"),
+      even when a published pack shows it folded as one row.
+    - `subtotal`: "Subtotal …" / "Total …" rows. A section and its subtotal carry the **same** total.
+    - `line`: everything else: accounts, KPIs, Gross Margin, Net Income.
+    - `header`: a label row with no values (only when headers are included).
+    - **Never sum a depth on a report page.** One Executive Summary had Revenue (section) +
+      Subtotal Revenue (same 250,448), and OpEx twice (OpEx by Department and OpEx by Acct, both
+      180,413) next to KPIs at the same depth. Take a total by label (`match: 'Subtotal OpEx'`,
+      `'Net Income'`), or sum `rowKind: 'line'` under one section.
   - For "top expenses" questions use `rowKind: 'account'` (or `'group'` for categories). Empty rows
     are skipped by default, so fewer than N rows means only that many have values: say so.
   - **Locked plans** carry no account tags. `jirav.readGridValues` then infers kinds from structure and adds
@@ -93,7 +104,8 @@ blank and the row would vanish). With several grids on one page the result is an
 - **`type`**
   - `MONETARY` / `monetary`: currency.
   - `NUMBER:PERCENT2` / `percentage`: a **fraction**. 0.09 = 9%, and −68.79 = −6,879% (values
-    can exceed ±1).
+    can exceed ±1). Custom-table grids take percents typed as whole numbers (9 = 9%): multiply by 100 before
+    typing a value back.
   - `NUMBER`: a plain number.
 - **`attrs`**: row attributes, e.g. `{ Department: 'All' }` on plan pages.
 - **`truncated`**: filters removed rows. It doesn't mean data is missing.

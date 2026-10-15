@@ -16,6 +16,12 @@ await jirav.listPlans()
 ```
 
 - `shortName` is what the UI shows ("2026 Rolling Fcst"); `name` is a description (often empty).
+- **`planId` is an opaque id, never a name.** Most companies (12 of 16 checked) have one plan
+  whose planId is literally `Budget`, usually their first plan, whatever it's called now
+  (Auto-Forecast, Trended Forecast, Plan 12/23…). In 4 of them a *different* plan is named
+  Budget, so `/plan/x/Budget/…` opened the wrong plan. Match the user's words against
+  `shortName` only, take the `planId` from that row, and never build a URL or lookup from a name.
+  `listPlans()` adds a `warning` to a planId that reads like a name.
 - `type`: `PLAN_OF_RECORD` (often locked) or `ROLLING`. The plan of record can still show `ROLLING`:
   see [Plan of record and other plan facts](#plan-of-record-and-other-plan-facts).
 - `editable: false` means **locked: do not edit**.
@@ -138,6 +144,8 @@ System-calculated lines (e.g. "System Salaries" from staffing) aren't editable. 
    - No Manual Input row for that department yet? Select the department in the **Department**
      filter above the grid and type into the account row there, which creates it. Then set the
      filter back; it's remembered across plans.
+   - An account with a driver isn't editable on its account row, even with the filter set: type
+     into its Manual Input row.
 2. **Click** the cell (`jirav.readGridValues.cellPoint('<row label>', 'YYYY-MM')` scrolls it into view
    and returns its point), press **Enter** (typing straight away can drop keystrokes), select all,
    type the number, **Enter**. Repeat for more cells. To **clear** a typed value, click the cell and
@@ -159,7 +167,17 @@ badge shows next to the plan name while it's on. Read it with
 `(await jirav.getAutoForecast(planId)).plan.enabled`. Turning it on in one plan doesn't change
 any other plan (verified on a copy).
 
-While on, it fills forecast months from history, and **overrides plan drivers** on the accounts it
-covers ([plan-drivers.md](plan-drivers.md#auto-forecast-overrides-drivers)). The method and
-coverage (which accounts and departments) are company-wide:
+While on, it fills forecast months from history at the **top-level** accounts (an account not in
+a group, or the group itself), per department. What happens to what's already there depends on
+where it sits (verified on a copy):
+
+- **Top-level account:** the Auto-Forecast row is **added** to typed values and drivers (typed
+  1,000 + forecast 500 = 1,500). Turning it on can double-count.
+- **Account inside a group:** the group gets the Auto-Forecast row. The accounts' drivers and typed
+  values show nothing while it's on. They aren't deleted: turning it off brings them back.
+- **System Salaries** are zero while it's on.
+
+It changes Revenue and COGS too. Before turning it on, tell the user which of these applies to the
+lines they care about. Drivers: [plan-drivers.md](plan-drivers.md#auto-forecast-and-drivers). The
+method and coverage (which accounts and departments) are company-wide:
 [forecast-settings.md](forecast-settings.md).

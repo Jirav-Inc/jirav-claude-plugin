@@ -30,7 +30,10 @@ that blocks the browser: if that happens, ask them to Cancel it, capture, and ex
 | A plan grid | Right-click a cell → **Export** → CSV Export / **Excel Export** | `<Page>.xlsx` (e.g. `Operating Expenses.xlsx`, 11 KB) |
 | One dashboard tile | Tile ⋯ → **Export** (click, it doesn't open on hover) → PNG / PDF / SVG / **CSV** | `<Tile>.csv`: `Time Period` + one column per series, UTF-8 with BOM |
 
-Wait for it with `await jirav.exports.wait()` (returns the new file; a package PDF takes up to ~15 s), then:
+Wait for it with `const f = await jirav.exports.wait()` (a package PDF takes up to ~15 s). It returns only a
+file it hasn't returned before. `{timedOut: true}` means **no new file**: don't read anything, check the
+Export and do it again; until a `wait()` succeeds, reads without an index refuse. Read the file by its
+index, `readXlsx(f.i)`. Then:
 
 ```js
 jirav.exports.list()   // [{i, name, size, type, at}], newest last
@@ -45,7 +48,7 @@ Don't use:
 ## 3. Read it in place
 
 ```js
-await jirav.exports.readXlsx()                      // newest file: {name, sheets: [{name, rows, formulaCells}]}
+await jirav.exports.readXlsx(f.i)                   // {name, sheets: [{name, rows, formulaCells}]}
 await jirav.exports.readXlsx(i, {formulas: 'text'}) // formulas as "=…" instead of values
 // CSV: atob((await jirav.exports.readBase64(i)).base64), strip the leading BOM
 ```

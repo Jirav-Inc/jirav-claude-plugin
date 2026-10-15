@@ -17,6 +17,32 @@ await jirav.listDateRanges()
 one**: many companies already have what you need. For "this month last year", look for
 `start: {pointer: 'THIS_MONTH', shift: -12}` with `width: 1`. Companies name it themselves (one calls it "LY LM (S)").
 
+## Today vs the close month
+
+**System ranges count from today's calendar month, not the close month.** With today in Oct-26
+and the close month Apr-26 (actuals through April), the system ranges resolved to:
+
+| System range | Dates | |
+|---|---|---|
+| Trailing 3 months | Jul–Sep 2026 | all forecast |
+| Trailing 12 months | Oct-25–Sep-26 | 5 months forecast |
+| This Year-to-date | Jan–Oct 2026 | 6 months forecast |
+
+So a "trailing 3-month average of actuals" built on the system range averages forecast months.
+Report columns on relative ranges follow today too: a "This Month" column showed Oct-26 while
+the close month was Apr-26. When the user means actuals (trailing, year to date, averages of
+history), use a range anchored on the **Close Month**:
+
+1. Check `(await jirav.getPeriods(planId)).closeMonth` against the range's `dates`. If the range
+   runs past the close month, say so.
+2. Look for a Close-Month range in `listDateRanges()`: `start.pointer: 'CLOSE_MONTH'`. One
+   company had "Trailing 3 Mo to Close Mo" (`shift: -2`, width 3 → Feb–Apr 2026) and "Year
+   Through Close Mo".
+3. None fits: create one (company-wide, so confirm first). Start = **Close Month**, Width = N,
+   Start Shift = **−(N−1)**. Width counts forward from Start, so a trailing range needs the
+   negative shift: Close Month, width 3, shift −2 → Feb–Apr 2026 (tested).
+4. Tell the user which range you used and its dates.
+
 ## The Ranges picker
 
 Opened from a driver input's **Range** (Time Options), in plan or global drivers.

@@ -6,7 +6,7 @@ another account, or a formula. Copying a plan copies its drivers. For rules that
 plan, see [global-drivers.md](global-drivers.md).
 
 **Settings:** company-wide date ranges used in driver inputs are in [date-ranges.md](date-ranges.md);
-Auto-Forecast can override plan drivers ([forecast-settings.md](forecast-settings.md)).
+Auto-Forecast hides or adds to plan drivers ([below](#auto-forecast-and-drivers)).
 
 Drivers on the same line **add together**, so check for existing ones before adding. That
 includes [GL] global drivers on custom lines. Inputs can use [assumptions](assumption-values.md) and [date ranges](date-ranges.md).
@@ -63,6 +63,7 @@ driver isn't producing values; that's often Auto-Forecast (below), so flag it to
 | A per-employee cost: software, benefits, equipment (New for one-time costs) | Amount per Headcount |
 | A cost as a share of another line: payroll tax, commissions, merchant fees, COGS % | % of Another Account |
 | A flat amount, "same month last year × 1.1", or any formula | Custom |
+| Move or reclass a cost to another account or department (labor to COGS, overhead across departments) | **Allocation**, not Custom drivers ([drivers-overview.md](drivers-overview.md#allocations)) |
 
 - Put any rate the user might change into an [assumption](assumption-values.md), not a constant,
   so a scenario changes one number.
@@ -109,17 +110,30 @@ Driver, Clone Driver, Clone, Clone To and Delete Driver.
 Several drivers on one line **add up**, including [GL] global drivers (plan 5 + global 7 = 12,
 verified).
 
-## Auto-Forecast overrides drivers
+## Auto-Forecast and drivers
 
-If Auto-Forecast is on for the plan and covers the account, it **silently wins**:
+If Auto-Forecast is on for the plan and covers the account ([plans.md → Auto-Forecast](plans.md#auto-forecast)):
 
-- the drivers stay, but produce nothing (`misconfigured: true` in `jirav.listPlanDrivers`);
-- an **Auto-Forecast** line supplies the values instead.
+- **Inside a group:** the drivers stay, but produce nothing (`misconfigured: true` in
+  `jirav.listPlanDrivers`); the group's **Auto-Forecast** line supplies the values.
+- **On a top-level account:** the driver still counts, and the Auto-Forecast line is added on top
+  (driver 8,091 + forecast 500 = 8,591).
 
 Turning Auto-Forecast off for the plan brings the drivers back. So before adding a driver, check
 `(await jirav.getAutoForecast(planId)).plan.enabled`. If it's on, ask the user whether to turn it
 off for this plan, or to exclude the account in the company's Custom Auto-Forecast settings
 ([plans.md → Auto-Forecast](plans.md#auto-forecast)).
+
+## Drivers that read their own line
+
+A driver whose input is the line itself over a past range (`@type: "output"` in
+`jirav.listPlanDrivers`, picker → Driver Logic → Output, or the same account; range Last Month,
+T3M / T6M average) feeds on everything else on that line. **Anything you add there keeps growing**:
+600 typed once into a line driven by its own T6M average raised the next seven months by about
+1,066, still rising. A monthly addition (CapEx amortization, an Allocation In, typed values)
+compounds faster. Before sending an amount into an account, check its drivers for this; if found,
+tell the user and offer another account or changing that driver. After the change, read 6+ months
+ahead: a line that keeps rising is this.
 
 ## Verify
 
