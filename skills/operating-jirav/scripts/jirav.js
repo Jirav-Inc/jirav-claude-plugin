@@ -9,7 +9,7 @@
 // After a full page load (navigate, reload, switching company) the globals are gone. ONE line
 // restores the core and every block that was loaded in this tab:
 //
-//   location.host !== 'app.jirav.com' ? 'WAIT: on '+location.host+', not app.jirav.com yet: retry in a few seconds' : (typeof jirav !== 'undefined' && jirav.build === '928ba45c') ? jirav.status() : (localStorage.jiravKit || '').includes("KIT_BUILD='928ba45c'") ? (0, eval)(localStorage.jiravKit) : 'PASTE scripts/jirav.min.js (not cached in this browser, or out of date)'
+//   location.host !== 'app.jirav.com' ? 'WAIT: on '+location.host+', not app.jirav.com yet: retry in a few seconds' : (typeof jirav !== 'undefined' && jirav.build === '8038ac4c') ? jirav.status() : (localStorage.jiravKit || '').includes("KIT_BUILD='8038ac4c'") ? (0, eval)(localStorage.jiravKit) : 'PASTE scripts/jirav.min.js (not cached in this browser, or out of date)'
 //
 // Blocks add page-specific helpers: one function mounted on jirav, or a namespace when there are several.
 // Paste a block file after the core when jirav.page() suggests it:
@@ -25,30 +25,37 @@
 //   jirav.listTenants() / jirav.getTenant(name?)  companies; API base = `${apiServerURI}/${tenantId}`
 //   jirav.listDashboards()          [{id, name, position}]          position 1 = default
 //   jirav.listReports()             [{id, name, status, lastUpdateTime}]  newest first
-//   jirav.listReportPages(reportId) [{name, type, hasGrid}]
-//   jirav.listPlans()               [{planId, shortName, type, editable, cutoverDate, ..., warning?}]  active plans only; warning: a planId that reads like a name
+//   jirav.listReportPages(reportId?) [{name, type, hasGrid, slug, dashboardId?}]  reportId defaults to the open report; slug = the page's URL segment
+//   jirav.listPlans()               [{planId, shortName, type, editable, cutoverDate, ..., autoRollForward, autoForecast, porTime, warning?}]  active plans only; warning: a planId that reads like a name
+//   jirav.listArchivedPlans()       [{planId, shortName, type, editable, porTime, archiveTime, ...}]  archived plans (snapshots, former PoRs)
+//   jirav.getSubscription()         {subscription: 'Controller Essentials'|'CFO'|null, departments, forecastCapabilityLevel}
 //   jirav.listCustomTables()        [{id, name}]
-//   jirav.listPlanDrivers(planId)   [{id, name, type, page, account, department, inputs, misconfigured}]  this plan only;
+//   jirav.listPlanDrivers(planId)   [{id, name, type, page, account, department, frequency, start, end, output?, inputs, misconfigured}]  output: a Balance Sheet driver's {account, change: increase|decrease};  this plan only;
 //                                   type = the page for formula drivers (revenue, opex…) or the kind (annual_target, capex…)
 //   jirav.listGlobalDrivers()       [{id, name, table, line, start, end, inputs, misconfigured}]  company-wide
 //   jirav.listAssumptions()         [{tableId, table, assumptions: [{id, name, type}]}]  definitions; values are per plan
+//   jirav.listAssumptionValues(planId)  same, with each assumption's value in that plan (percents as fractions)
+//   jirav.readAuditLog({from, to, area, action, category, user, details})  every audit entry (not just the page's 100), UTC + local time
 //   jirav.listDateRanges()          [{id, name, type: system|custom, start, width, dates: [from, to]}]
-//   jirav.listDepartments()        [{id, name, path, unassigned}]  company-wide
+//   jirav.listDepartments()        [{id, name, path, parent, unassigned}]  company-wide; parent = the id of the department it sits under
 //   jirav.listStaff(planId)         [{id, name, role, department, hireDate, termDate, annualWages, kind: imported|planned, raises}]  this plan
 //   jirav.getChartOfAccounts()     [{section, mode: manual|auto, accounts: [{key, name, category, mappedFrom}], notMapped}]  company-wide
 //   jirav.getDepartmentMappings()  [{key, name, accounting: [...], workforce: [...]}]  company-wide
-//   jirav.getLimits()               plan/department/account/dashboard caps for this company
+//   jirav.getLimits()               plan/department/account/dashboard caps for this company; departments.used = {total, top} (Unassigned excluded)
 //   jirav.listGoals()              [{section, id, name, type, series, values: {'YYYY-MM': n}}]  company-wide targets
 //   jirav.listUsers()               {users: [{name, email, role, lastActivity}], invitations, roles}
 //   jirav.getVarianceRules()        [{line, favorable, valueThreshold, percentThreshold, match, exceptions}]
 //   jirav.getCashFlowSetup()        [{key, name, parent, activity: operating|investing|financing}]  balance sheet → cash flow class
 //   jirav.listReportSources(company?) [{id, name, type, planId?, pointsTo?, dates}]  what report pages/tiles can show (Actuals, plans, Current PoR, Goals)
-//   jirav.getReportSetup(reportId)  [{page, type, template, departments, groups: [{source, range, show, compareTo, thirdSource, variance, percentOf}]}]  per page; compareTo carries its relative range; variance.formula: Δ and % basis per section (revenue / expense)
-//   jirav.listDashboardTiles(dashboardId)  [{id, kind, title, chart, source, compareTo, range, frequency, position}]
-//   jirav.getTileValues(dashboardId, tileId)  {title, periods, rows: [[label, ...values]], overlay?}  a chart tile's numbers
-//   jirav.getDataStatus()          {accounting: {source, company, connected, last…}, workforce, customTables, closeMonth}  where actuals come from, how fresh
-//   jirav.getPeriods(planId?)       {fiscalYearStartMonth, closeMonth, plan?: {actuals, forecast, editable}}
+//   jirav.getReportSetup(reportId?)  [{page, type, template, departments, groups: [{source, range, show, compareTo, thirdSource, variance, percentOf}]}]  per page; compareTo carries its relative range; variance.formula: Δ and % basis per section (revenue / expense)
+//   jirav.listDashboardTiles(dashboardId)  [{id, kind, title, chart, source, compareTo, range, frequency, position, text?}]  text: a TEXT tile's content as plain text
+//   jirav.getTileValues(dashboardId, tileId)  {title, periods, columns?, rows: [[label, ...values]], overlay?} (text tiles: {title, text})  a chart tile's numbers; tileId or title; columns: value|compare|delta|deltaPct when a comparison is on
+//   jirav.getDataStatus()          {accounting: {source, company, connected, last…}, workforce, customTables, closeMonth, actualsFrom, actualsThrough}  where actuals come from, how fresh, which months hold them
+//   jirav.getPeriods(planId?)       {fiscalYearStartMonth, closeMonth, closeMonthSource: 'Specific Date'|'Accounting system', accountingCloseMonth, plan?: {actuals, forecast, editable}}
 //   jirav.getAutoForecast(planId?)  {company: {mode, method, departments, accountSettings}, plan?: {enabled}}
+//   jirav.getArApSettings()         {ar: {method, delay, account}, ap: {method, delay, account, accrualAccounts}}  Settings → Forecast → A/R and A/P
+//   jirav.getCompanySettings()      {general, accounting: {fiscalYearStart, currency, method, closeMonth, ...}, plans: {salaryExpenses, cash}, staffing, labels}  Settings → Company
+//   jirav.getSystemHealth()         [{severity, scope, plan, kind, message, driverId?}]  the ⚠ by the plan name; [] = no issues
 //   jirav.go(path) / jirav.ready()  in-app navigation that keeps the kit loaded; wait for load
 //   jirav.readTableRows(i?)        rows of a plain/Material table (Audit Log, Users) as {header: text}
 //   jirav.saveBar()                 {pending, blocked, reason?, covered, save:{x,y}, cancel:{x,y}}  the bottom SAVE CHANGES / Cancel bar; blocked: SAVE is disabled (reason = its tooltip), don't click; covered: an open panel hides it
@@ -58,6 +65,7 @@
 //   jirav.pageLinks()               plan/report sidebar links
 //   jirav.deepAll(root, selector)   querySelectorAll through shadow DOM
 //   jirav.at(el)                    click point of an element in screenshot coordinates {x, y}
+//   jirav.menu() / await jirav.menu.settled()   items of the open menu [{label, x, y}] ({offscreen} / {settling} flagged); settled() waits for the animation
 //   jirav.menu()                    items of the open menu/dropdown -> [{label, x, y}] (to click)
 //   jirav.drag(fromEl, toEl, {where:'before'|'after'})   drag-reorder within one list (see block docs)
 
@@ -106,21 +114,55 @@ var jirav = (() => {
   const listReports = async (company) => (await api('/v2/reportPackages/packages', company))
     .map(r => ({ id: r.id, name: r.name, status: r.status, lastUpdateTime: r.lastUpdateTime }))
     .sort((x, y) => String(y.lastUpdateTime).localeCompare(String(x.lastUpdateTime)));
-  const listReportPages = async (reportId, company) => (await api(`/v2/reportPackages/package/${reportId}/elements`, company))
+  // A page's URL segment: the name lowercased, spaces to dashes, URL-encoded twice ("P&L" -> "p%2526l").
+  // encodeURIComponent leaves ' alone; Jirav encodes it ("FY'25" -> "fy%252725"), but not ( ) (seen).
+  const enc = x => encodeURIComponent(x).replace(/'/g, '%27');
+  const pageSlug = n => encodeURIComponent(enc(String(n).toLowerCase().replace(/ /g, '-')));
+  // The open report's id: the URL slug ends with it ("monthly-review-feb-26-frp89p") or is the name's slug.
+  const openReportId = async () => {
+    const seg = location.pathname.split('/');
+    if (seg[2] !== 'report' || !seg[3]) return null;
+    const rs = await listReports(), slug = seg[3], tail = slug.split('-').pop();
+    const r = rs.find(x => x.id === tail) || rs.find(x => pageSlug(x.name) === slug);
+    return r ? r.id : null;
+  };
+  const reportIdOrOpen = async (reportId, company, fn) => {
+    if (reportId) return reportId;
+    const id = !company && await openReportId();
+    if (!id) throw new Error(`${fn}(reportId) needs a reportId (from listReports), or open the report first`);
+    return id;
+  };
+  const listReportPages = async (reportId, company) => (await api(`/v2/reportPackages/package/${await reportIdOrOpen(reportId, company, 'listReportPages')}/elements`, company))
     .flatMap(s => s.reports || []).filter(p => p.type !== 'area')
-    .map(p => ({ name: p.reportName, type: p.type, hasGrid: p.type === 'reportWithSources' }));
+    .map(p => ({ name: p.reportName, type: p.type, hasGrid: p.type === 'reportWithSources', slug: pageSlug(p.reportName),
+      ...(p.type === 'dashboard' && p.id ? { dashboardId: p.id } : {}) }));
   // planIds are opaque, but a company's first plan often has the planId "Budget" whatever it's called
   // now, sometimes next to a different plan named Budget. Flag a planId that reads like a plan name.
   const listPlans = async (company) => {
     const ps = await api('/v1/model/plans', company), low = v => String(v || '').trim().toLowerCase();
-    return ps.map(p => {
+    const af = await Promise.all(ps.map(p => api(`/v1/auto-forecast-config/${p.planId}`, company).then(x => !!(x && x.enabled), () => null)));
+    return ps.map((p, i) => {
       const other = ps.find(q => q !== p && low(q.shortName) === low(p.planId));
       const warning = other ? `planId "${p.planId}" is NOT the plan named "${other.shortName}" (that one is ${other.planId}): match plans by shortName`
         : low(p.planId) !== low(p.shortName) && /^[a-z]/i.test(p.planId) && /[A-Z]/.test(p.planId) ? `planId "${p.planId}" is an id, not this plan's name ("${p.shortName}")` : null;
       return { planId: p.planId, shortName: p.shortName, name: p.name, type: p.type, editable: p.editable,
         archived: p.archived, startDate: p.startDate, cutoverDate: p.cutoverDate, endDate: p.endDate, currency: p.currency,
-        updateTime: p.contentUpdateTime || p.updateTime, ...(warning ? { warning } : {}) };
+        updateTime: p.contentUpdateTime || p.updateTime, autoRollForward: !!p.autoRollForward, autoForecast: af[i],
+        ...(p.autoRollForward && p.autoRollForwardConfiguration ? { autoRollForwardDay: p.autoRollForwardConfiguration.day ?? p.autoRollForwardConfiguration } : {}),
+        porTime: p.porTime || null, ...(warning ? { warning } : {}) };
     });
+  };
+  // Archived plans (listPlans shows active ones only): month-end snapshots, former plans of record.
+  const listArchivedPlans = async (company) => (await api('/v1/model/plans/archive', company)).map(p => ({
+    planId: p.planId, shortName: p.shortName, type: p.type, editable: p.editable, cutoverDate: p.cutoverDate,
+    startDate: p.startDate, endDate: p.endDate, porTime: p.porTime || null, archiveTime: p.archiveTime || null }));
+  // The company's subscription as Jirav sells it. The app itself switches features on forecastCapabilityLevel
+  // (PARTIAL hides plan management, Assumptions and fx), and any user can read it (the billing API needs
+  // billing rights). NONE has no known name: subscription null, ask.
+  const getSubscription = async (company) => {
+    const c = await api('/v1/companyInfo', company), lvl = c.forecastCapabilityLevel || null;
+    return { subscription: lvl === 'PARTIAL' ? 'Controller Essentials' : lvl === 'FULL' ? 'CFO' : null,
+      departments: !!c.supportsMultipleDepartments, forecastCapabilityLevel: lvl };
   };
   const listCustomTables = async (company) => (await api('/v1/customTable', company))
     .map(t => ({ id: t.customTableConfig.customTableId, name: t.customTableConfig.name }));
@@ -130,9 +172,17 @@ var jirav = (() => {
     const [ds, coa, deps] = await Promise.all([api(`/v1/driver/${planId}/instances`, company), api('/v1/coa/config', company), listDepartments(company)]);
     const acct = {}; Object.values(coa).forEach(sec => (sec.jiravAccounts || []).forEach(a => { acct[a.key] = a.name; }));
     const dep = id => id == null ? null : (deps.find(x => x.id === 'ext:' + id || x.id === String(id)) || {}).name || String(id);
+    // Balance Sheet drivers write to `target` ("liabilities_increase" on one account), not `allocation`.
+    const bsOutput = t => { const m = String(t.dataElementId || '').match(/^(\w+?)_(increase|decrease)$/);
+      const f = (t.filters || []).find(x => /Account$/.test(x.dimId)), id = f && f.filter && f.filter.SingleElement && String(f.filter.SingleElement.elementId).replace(/^ext:/, '');
+      return { account: id ? acct[id] || id : null, change: m ? m[2] : t.dataElementId || null }; };
     return ds.map(d => { const a = d.allocation || {};
       return { id: d.instanceId, name: d.name, type: d.driverType, page: a.modelElementId,
         account: a.account == null ? null : acct[a.account] || String(a.account), department: dep(a.department),
+        frequency: (d.config && d.config.formula && d.config.formula.frequency) || null,   // every N months from start
+        start: d.start ? (d.start.date ? String(d.start.date).slice(0, 7) : d.start.pointer || null) : null,
+        end: d.end ? (d.end.date ? String(d.end.date).slice(0, 7) : d.end.pointer || null) : null,
+        ...(d.target ? { output: bsOutput(d.target) } : {}),
         inputs: d.config, misconfigured: !!d.isMisconfigured }; });
   };
   // Global drivers: company-wide, on custom table lines, applied in every plan. misconfigured = its
@@ -150,6 +200,54 @@ var jirav = (() => {
   const listAssumptions = async (company) => (await api('/v1/keyAssumption', company)).map(t => ({
     tableId: t.id, table: t.name,
     assumptions: (t.elements || []).map(e => e.constant || Object.values(e)[0]).map(c => ({ id: c.id, name: c.name, type: c.type })) }));
+  // A read Jirav serves as POST (empty body, its X-Requested-With header): a model table's contents. Used for
+  // assumption values and for which months hold actuals. The kit's only other POST is the audit-log read.
+  const readModelTable = async (model, table, company) => {
+    const t = await getTenant(company);
+    const r = await fetch(`${t.base}/v1/model/plan/${model}/tables/content?tables=${encodeURIComponent(table)}`,
+      { method: 'POST', credentials: 'include', headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } });
+    if (!r.ok) throw new Error(`table ${table} of ${model} -> ${r.status}`);
+    return (await r.json())[table] || {};
+  };
+  // The Audit Log, all of it: the page shows at most 100 rows (it asks for one page); this pages through.
+  // Like the table read, Jirav serves this read as a POST (JSON filter body); it changes nothing.
+  // Times come back as UTC without a zone: `time` gets the Z, `local` is the browser's local time.
+  // opts: {from, to: 'YYYY-MM-DD' (inclusive; default the last 30 days), area, action, category, user (email),
+  // limit (default 2000), details: true adds each entry's changes [{name, type: OLD|NEW|ROW_KEY|COLUMN_KEY|CUSTOM, value}]}
+  const readAuditLog = async (opts = {}, company) => {
+    const t = await getTenant(company), day = d => d.toISOString().slice(0, 10);
+    const to = opts.to || day(new Date()), from = opts.from || day(new Date(Date.now() - 30 * 864e5));
+    const end = day(new Date(Date.parse(to + 'T00:00:00Z') + 864e5));          // the server's end is exclusive
+    const fields = { event_time: { start: from, end, '@type': 'timespan' } };
+    for (const [k, f] of [['area', 'area'], ['action', 'action'], ['category', 'category'], ['user', 'user_email']])
+      if (opts[k]) fields[f] = { '@type': 'enumList', values: [].concat(opts[k]) };
+    const H = { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' };
+    const limit = opts.limit || 2000, out = [];
+    for (let off = 0; off < limit; off += 100) {
+      const r = await fetch(`${t.base}/v1/audit-query/find`, { method: 'POST', credentials: 'include', headers: H,
+        body: JSON.stringify({ fields, paging: { limit: 100, offset: off }, sorting: [{ event_time: 'desc' }] }) });
+      if (!r.ok) throw new Error(`audit log -> ${r.status}`);
+      const page = await r.json(); out.push(...page);
+      if (page.length < 100) break;
+    }
+    const rows = out.slice(0, limit).map(e => { const utc = e.time ? (/[zZ]|[+-]\d\d:?\d\d$/.test(e.time) ? e.time : e.time + 'Z') : null;
+      return { id: e.id, time: utc, local: utc ? new Date(utc).toLocaleString() : null, user: e.userEmail, area: e.area, category: e.category,
+        item: e.item, action: e.action, plan: e.planShortName }; });
+    if (opts.details) await Promise.all(rows.map(async row => { row.changes = await api(`/v1/audit-query/details/${row.id}`, company).catch(() => null); }));
+    return { from, to, count: rows.length, truncated: out.length >= limit, rows };
+  };
+  // A plan's assumption values: [{tableId, table, assumptions: [{id, name, type, value}]}]; percents as fractions.
+  const listAssumptionValues = async (planId, company) => {
+    if (!planId) throw new Error('listAssumptionValues(planId) needs a planId (jirav.listPlans())');
+    const defs = await listAssumptions(company);
+    return Promise.all(defs.map(async d => {
+      const tb = await readModelTable(planId, d.tableId, company), rows = (tb.info || {}).rows || [], cells = (tb.content || {}).cells || [];
+      const byId = {};
+      rows.forEach((row, k) => { const id = ((row.metadata || {}).properties || {}).KA_ID, v = ((cells[k] || [])[1] || [])[0];
+        if (id) byId[id] = v == null || v === '' ? null : (isNaN(+v) ? v : +v); });
+      return { tableId: d.tableId, table: d.table, assumptions: d.assumptions.map(a => ({ ...a, value: a.id in byId ? byId[a.id] : null })) };
+    }));
+  };
   // Date ranges usable in drivers, reports and tiles: built-in ('system') and the company's own ('custom').
   const listDateRanges = async (company) => (await api('/v1/dateRange', company)).filter(r => !r.deleted).map(r => ({
     id: r.id, name: r.name, type: r.rangeType, start: r.start, width: r.width, end: r.end,
@@ -160,7 +258,7 @@ var jirav = (() => {
     return out;
   });
   const listDepartments = async (company) => dimElements(await api('/v1/model/dimensions/global/sys:department', company))
-    .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)).map(d => ({ id: d.id, name: d.displayedName, path: d.displayPath || null, unassigned: !!d.isUnassigned }));
+    .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)).map(d => ({ id: d.id, name: d.displayedName, path: d.displayPath || null, parent: d.parentId ? (d.parentId.id || d.parentId) : null, unassigned: !!d.isUnassigned }));
   const listStaff = async (planId, company) => {
     if (!planId) throw new Error('listStaff(planId) needs a planId');
     const [deps, emp] = await Promise.all([listDepartments(company), api(`/v1/model/dimensions/plan/${planId}/sys:employee`, company)]);
@@ -188,7 +286,13 @@ var jirav = (() => {
     return (c.jiravDepartments || []).sort((a, b) => a.sortOrder - b.sortOrder).map(d => ({ key: d.key, name: d.name, parent: d.parentKey,
       accounting: ((c.accountingMappings || {})[d.key] || []).map(k => acc[k] || k), workforce: ((c.staffingMappings || {})[d.key] || []).map(k => wf[k] || k) }));
   };
-  const getLimits = async (company) => api('/v1/config/capacity-limits', company);
+  // Caps, plus the departments used (as the Departments page header counts them: Unassigned excluded).
+  const getLimits = async (company) => {
+    const [l, deps] = await Promise.all([api('/v1/config/capacity-limits', company), listDepartments(company)]);
+    const real = deps.filter(d => !d.unassigned);
+    if (l.departments) l.departments.used = { total: real.length, top: real.filter(d => !d.parent).length };
+    return l;
+  };
   const listGoals = async (company) => {
     const [cfg, input] = await Promise.all([api('/v2/goals/config', company), api('/v2/goals/input', company)]);
     return (cfg.sections || []).flatMap(sec => (sec.goals || []).map(g => ({ section: sec.name, id: g.id, name: g.name,
@@ -211,9 +315,13 @@ var jirav = (() => {
     id: x.id, name: x.shortName || x.name, type: x.type, planId: x.planId || null,
     pointsTo: x.type === 'PLAN_OF_RECORD' ? x.name : undefined, dates: [String(x.min).slice(0, 7), String(x.max).slice(0, 7)] }));
   const getReportSetup = async (reportId, company) => {
-    if (!reportId) throw new Error('getReportSetup(reportId) needs a reportId (from listReports)');
-    const [els, sources, ranges, deps] = await Promise.all([api(`/v2/reportPackages/package/${reportId}/elements`, company),
-      api('/v2/reports/sources', company), api('/v1/dateRange', company), listDepartments(company)]);
+    reportId = await reportIdOrOpen(reportId, company, 'getReportSetup');
+    const [els, sources, ranges, deps, per] = await Promise.all([api(`/v2/reportPackages/package/${reportId}/elements`, company),
+      api('/v2/reports/sources', company), api('/v1/dateRange', company), listDepartments(company), getPeriods(null, company).catch(() => ({}))]);
+    const closeMonth = per.closeMonth || null;
+    // A published package is a frozen copy: its ranges were resolved when it was published, so today's
+    // dates (and warnings built on them) don't apply. Read its months from the page (readGridValues periods).
+    const published = ((await listReports(company)).find(r => r.id === reportId) || {}).status === 'PUBLISHED';
     // Relative range: a month offset ("-12" = previous year) or a keyword such as YEAR_TOTAL.
     const shift = s => { if (s != null && isNaN(Number(s))) return String(s).toLowerCase().replace(/_/g, ' ');
       const n = Number(s || 0); return n === 0 ? 'same as primary' : n === -12 ? 'previous year' : n === 12 ? 'next year' : `${n > 0 ? '+' : ''}${n} months`; };
@@ -237,17 +345,22 @@ var jirav = (() => {
     };
     const rng = r => { if (!r || !r.rangeId) return null; const x = ranges.find(y => y.id === r.rangeId); return x ? x.name : r.rangeId; };
     return els.flatMap(sec => sec.reports || []).filter(p => p.type !== 'area').map(p => {
-      const out = { page: p.reportName, type: p.type, template: p.reportType || null };
+      const out = { page: p.reportName, type: p.type, template: p.reportType || null, ...(published ? { published: true } : {}) };
       if (p.typeSpecificConfig) out.departments = depFilter(p);
       if (p.reportGroupsConfigWithSources) out.groups = p.reportGroupsConfigWithSources.map(g => {
         const b = g.builderConfig || {}, v = b.variance;
         // dates the range resolves to now, and a warning when they fall outside the source's data
         const rr = b.range && ranges.find(y => y.id === b.range.rangeId), sx = b.source && sources.find(y => y.id === b.source);
-        const dates = rr && rr.resolvedRange ? [String(rr.resolvedRange.start).slice(0, 7), String(rr.resolvedRange.end).slice(0, 7)] : null;
+        const dates = !published && rr && rr.resolvedRange ? [String(rr.resolvedRange.start).slice(0, 7), String(rr.resolvedRange.end).slice(0, 7)] : null;
         const sd = sx ? [String(sx.min).slice(0, 7), String(sx.max).slice(0, 7)] : null;
         const outside = dates && sd && (dates[1] < sd[0] || dates[0] > sd[1]);
+        // Actuals (as the source or the comparison) over months after the close month: those months may not be
+        // closed or loaded, so a variance against them is misleading. Say so before ranking variances.
+        const usesActuals = /^actuals:/.test(b.source || '') || (b.compareToEnabled && /^actuals:/.test(b.compareTo || ''));
+        const pastClose = usesActuals && dates && closeMonth && dates[1] > closeMonth;
         return { name: g.groupName, source: src(b.source), range: rng(b.range), rangeDates: dates,
-          ...(outside ? { warning: `range ${dates.join('..')} is outside ${src(b.source)} (${sd.join('..')}): the page will be empty` } : {}),
+          ...(outside ? { warning: `range ${dates.join('..')} is outside ${src(b.source)} (${sd.join('..')}): the page will be empty` }
+            : pastClose ? { warning: `${/^actuals:/.test(b.source || '') ? 'shows' : 'compares to'} Actuals through ${dates[1]}, past the close month ${closeMonth}: months after it may not be closed` } : {}),
           show: Object.entries(b.periodicColumns || {}).filter(([, on]) => on).map(([k]) => k),
           compareTo: b.compareToEnabled ? `${src(b.compareTo)} (${shift(v && v.shift)})` : null,
           thirdSource: b.thirdSourceEnabled ? `${src(b.thirdSource)} (${shift(v && v.shiftThirdSource)})` : null,
@@ -257,6 +370,10 @@ var jirav = (() => {
       return out;
     });
   };
+  // A text tile's content is HTML (pictures embedded as data URLs): plain text, one line per paragraph, [image] for pictures.
+  const tileText = html => { if (!html) return ''; const d = new DOMParser().parseFromString(String(html).replace(/<img[^>]*>/gi, '[image]')
+      .replace(/<\/(p|div|li|h\d)>|<br\s*\/?>/gi, '\n'), 'text/html');
+    return (d.body.textContent || '').split('\n').map(l => l.trim()).filter(Boolean).join('\n'); };
   const listDashboardTiles = async (dashboardId, company) => {
     if (!dashboardId) throw new Error('listDashboardTiles(dashboardId) needs a dashboardId (from listDashboards)');
     const [tiles, ranges, sources] = await Promise.all([api(`/v3/tiles/dashboard/${dashboardId}`, company), api('/v1/dateRange', company),
@@ -267,19 +384,30 @@ var jirav = (() => {
       const r = tc.range && ranges.find(y => y.id === tc.range.rangeId);
       return { id: x.id, kind: x.formType, title: s.title || null, chart: s.type || null,
         source: src(ds.primaryPlanId), compareTo: src(ds.comparisonPlanId),
-        range: r ? r.name : (tc.range && tc.range.rangeId) || null, frequency: tc.frequency || null, position: s.position || null };
+        range: r ? r.name : (tc.range && tc.range.rangeId) || null, frequency: tc.frequency || null, position: s.position || null,
+        ...(x.formType === 'TEXT' ? { text: tileText(s.content) } : {}) };
     });
   };
   const getTileValues = async (dashboardId, tileId, company) => {
+    if (!/^\d+$/.test(String(tileId))) {   // a title: resolve it, so a typo doesn't become a bare 500
+      const ts = await listDashboardTiles(dashboardId, company), hits = ts.filter(t => String(t.title || '').toLowerCase() === String(tileId).toLowerCase());
+      if (hits.length !== 1) throw new Error(`tileId is a number from listDashboardTiles; "${tileId}" matches ${hits.length} tile titles` + (hits.length ? ': pass the id' : ''));
+      tileId = hits[0].id;
+    }
     const c = await api(`/v3/tiles/content/${dashboardId}/${tileId}`, company);
     const table = d => {
       if (!d || !d.metadata) return null;
       const cols = d.metadata.columns.slice(1);
       const cells = (d.contents && d.contents.cells) || [];
-      return { periods: cols.map(k => { const pr = (k.metadata && k.metadata.properties) || {}; return pr.DATE_RANGE_START === pr.DATE_RANGE_END ? pr.DATE_RANGE_START : `${pr.DATE_RANGE_START}..${pr.DATE_RANGE_END}`; }),
+      // With a comparison on, each period repeats as value, comparison, Δ and Δ% (column names SRC- / CMP- / DELTA- / %-).
+      const kind = k => /^SRC-/.test(k.name) ? 'value' : /^CMP-/.test(k.name) ? 'compare' : /^DELTA-/.test(k.name) ? 'delta' : /^%-/.test(k.name) ? 'deltaPct' : null;
+      const kinds = cols.map(kind);
+      return { ...(kinds.some(k => k && k !== 'value') ? { columns: kinds } : {}), periods: cols.map(k => { const pr = (k.metadata && k.metadata.properties) || {}; return pr.DATE_RANGE_START === pr.DATE_RANGE_END ? pr.DATE_RANGE_START : `${pr.DATE_RANGE_START}..${pr.DATE_RANGE_END}`; }),
         rows: cells.map(row => row.map((cell, i) => { const v = Array.isArray(cell) ? cell[0] : cell; return i === 0 ? v : (v === '' || v == null ? null : +v); })) };
     };
-    const out = { title: c.item && c.item.setup && c.item.setup.title, ...(table(c.tileData && c.tileData.data) || { note: 'no data table (text tile?)' }) };
+    const setup = (c.item && c.item.setup) || {};
+    if (setup.formType === 'TEXT') return { title: setup.title || null, text: tileText(setup.content) };
+    const out = { title: setup.title, ...(table(c.tileData && c.tileData.data) || { note: 'no data table' }) };
     const ov = table(c.tileData && c.tileData.overlayLineData);
     if (ov && ov.rows.length) out.overlay = ov.rows;
     return out;
@@ -292,22 +420,39 @@ var jirav = (() => {
       last('/v1/import/coa/info'), last('/v1/import/trialbalance/info'), last('/v1/import/budget/file/info'), last('/v1/import/employees/file/info'),
       last('/v1/import/customLines/file/info'), last('/v1/import/customLines/budget/file/info'), raw('/v1/import/customLines/gdrive/info'), getPeriods(null, company)]);
     const sel = (acc.body || []).find(x => x.selected) || null;
+    // Which months hold Income Statement actuals (the close month can lag or lead the data): the first and
+    // last month with any non-zero Revenue, COGS or OpEx actual.
+    let actualsFrom = null, actualsThrough = null;
+    try {
+      for (const tb of ['revenueByAccount-v2', 'cogsModule-v2', 'opexModule-v2']) {
+        const x = await readModelTable('main-actuals', tb, company), cols = ((x.info || {}).columns || []).map(c => c.name), cells = (x.content || {}).cells || [];
+        cols.forEach((c, ci) => { const m = String(c).match(/^(\d{4})_MONTHLY_(\d+)$/); if (!m) return;
+          if (!cells.some(row => { const v = ((row[ci] || [])[0]); return v != null && v !== '' && !isNaN(+v) && +v !== 0; })) return;
+          const ym = `${m[1]}-${String(m[2]).padStart(2, '0')}`;
+          if (!actualsFrom || ym < actualsFrom) actualsFrom = ym; if (!actualsThrough || ym > actualsThrough) actualsThrough = ym; });
+      }
+    } catch (e) { /* leave null: older companies may lack the -v2 tables */ }
     return {
       accounting: { source: sel ? sel.name : null, company: sel ? sel.companyName : null, connected: sel ? ping.ok : null,
         lastChartOfAccounts: coa, lastTrialBalance: tb, lastBudgetFile: budget },
       workforce: { source: (wf.body && wf.body.dataSource) || (staff ? 'Excel file' : null), lastStaffImport: staff },
       customTables: { lastActualsFile: ctActuals, lastBudgetFile: ctBudget,
         googleSheet: gsheet.body && gsheet.body.fileSelected ? { file: gsheet.body.importedFileName, last: gsheet.body.lastImport, auto: gsheet.body.autoImportEnabled } : null },
-      closeMonth: periods.closeMonth,
+      closeMonth: periods.closeMonth, actualsFrom, actualsThrough,
     };
   };
   const getPeriods = async (planId, company) => {
     const ym = d => d && String(d).slice(0, 7);
     const prevMonth = d => { const [y, m] = ym(d).split('-').map(Number); return new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 7); };
-    const [fys, ranges] = await Promise.all([api('/v1/companyInfo/fys', company), api('/v1/dateRange', company)]);
+    const [fys, ranges, cm] = await Promise.all([api('/v1/companyInfo/fys', company), api('/v1/dateRange', company),
+      api('/v1/company-setup/close-month', company).catch(() => null)]);
     const close = ranges.find(r => r.start && r.start.pointer === 'CLOSE_MONTH' && !r.start.shift && r.width === 1 && !r.deleted)
       || ranges.find(r => r.relativeType === 'close' && !r.deleted);
-    const out = { fiscalYearStartMonth: fys.month, closeMonth: close && close.resolvedRange ? ym(close.resolvedRange.start) : null };
+    // Close Month setting (Settings → Company → Accounting): a Specific Date set in Jirav, or the accounting
+    // system's close date (read-only in Jirav; often never set there, so it can be far behind the data).
+    const closeMonthSource = !cm ? null : cm.closeMonthSource === 'USER_SET' ? 'Specific Date' : 'Accounting system';
+    const out = { fiscalYearStartMonth: fys.month, closeMonth: close && close.resolvedRange ? ym(close.resolvedRange.start) : null,
+      closeMonthSource, accountingCloseMonth: cm && cm.externalCloseMonth ? ym(cm.externalCloseMonth) : null };
     if (planId) {
       const plan = (await api('/v1/model/plans', company)).find(p => p.planId === planId);
       if (!plan) throw new Error(`No active plan "${planId}" (archived plans aren't listed).`);
@@ -323,6 +468,54 @@ var jirav = (() => {
       departments: g.defaultSettings && g.defaultSettings.depSetup, accountSettings: g.accountSettings } };
     if (planId) out.plan = { planId, enabled: !!(await api(`/v1/auto-forecast-config/${planId}`, company)).enabled };
     return out;
+  };
+  // Settings → Company, every tab, read from the endpoints those tabs load (company-wide).
+  // The Labels tab's keys and their standard names (the app's label-manager list).
+  const STATEMENT_LABELS = { modelRevenue: 'Revenue', modelCogs: 'COGS', modelGrossMargin: 'Gross Margin', modelOpex: 'OpEx',
+    modelOperatingIncome: 'Operating Income', modelOtherIncomeExpense: 'Other Income & Expense', modelOtherIncome: 'Other Income',
+    modelOtherExpense: 'Other Expense', modelNetIncome: 'Net Income', modelAssets: 'Assets', modelCurrentAssets: 'Current Assets',
+    modelBankAccounts: 'Bank Accounts', modelOtherCurrentAssets: 'Other Current Assets', modelFixedAssets: 'Fixed Assets',
+    modelOtherAssets: 'Other Assets', modelLiabilities: 'Liabilities', modelCurrentLiabilities: 'Current Liabilities',
+    modelLongTermLiabilities: 'Long Term Liabilities', modelEquity: 'Equity' };
+  const getCompanySettings = async (company) => {
+    const g = p => api(p, company).catch(() => null);
+    const [info, cur, labels, method, close, imp, aging, re, plansCfg, staff, coa, per] = await Promise.all([g('/v1/companyInfo'),
+      g('/v1/company-setup/currency'), g('/v1/labels'), getTenant(company).then(t => fetch(t.base + '/v1/company-setup/accounting-method', { credentials: 'include' })).then(r => r.ok ? r.text() : null).then(x => x && x.replace(/"/g, '').trim(), () => null), g('/v1/company-setup/close-month'),
+      g('/v1/company-setup/import-setup'), g('/v1/company-setup/import-aging-detail'), g('/v1/company-setup/retained-earnings-override'),
+      g('/v1/plansConfiguration'), g('/v1/staffingConfig'), getChartOfAccounts(company), getPeriods(null, company).catch(() => ({}))]);
+    const acct = id => { if (id == null) return null; for (const sec of coa) { const a = sec.accounts.find(x => String(x.key) === String(id)); if (a) return a.name; } return String(id); };
+    const ym = d => d ? String(d).slice(0, 7) : null;
+    const reAcct = re && (re.externalAccounts || []).find(a => a.accountId === re.retainedEarningsAccountId);
+    return {
+      general: { name: info && info.name, shortName: info && info.shortName },
+      accounting: { fiscalYearStart: per.fiscalYearStartMonth || null, currency: cur && cur.currencyCode, method: typeof method === 'string' ? method : null,
+        retainedEarnings: reAcct ? reAcct.name : null,
+        closeMonth: close ? { source: close.closeMonthSource === 'USER_SET' ? 'Specific Date' : 'Accounting system', specificDate: ym(close.specificDate),
+          accountingCloseMonth: ym(close.externalCloseMonth), resolved: per.closeMonth || null } : null,
+        import: imp && imp.importMode, importAgingDetail: aging ? !!aging.enabled : null },
+      plans: plansCfg ? { salaryExpenses: acct(plansCfg.salariesAccount), cash: acct(plansCfg.cashAccount) } : null,
+      staffing: staff ? { countLeaversInTerminationMonth: staff.staffTerminationRounding === 'RoundUp', prorateSalaries: !!staff.proratedSalariesEnabled,
+        averageHoursPerWeek: staff.averageHoursPerWeek } : null,
+      // Only the labels on the Labels tab; changed = differs from the standard name.
+      labels: labels ? Object.entries(STATEMENT_LABELS).map(([k, std]) => ({ standard: std, label: labels[k] || std, changed: !!labels[k] && labels[k] !== std })) : null };
+  };
+  // A/R and A/P forecasting (company-wide). method: none | trended (percent of Revenue / OpEx) | delayed (days).
+  const getArApSettings = async (company) => {
+    const [c, coa] = await Promise.all([api('/v1/arApForecastingConfiguration', company), getChartOfAccounts(company)]);
+    const acct = id => { if (id == null) return null; for (const sec of coa) { const a = sec.accounts.find(x => String(x.key) === String(id)); if (a) return a.name; } return String(id); };
+    const one = (x, side) => !x ? null : { method: x['@type'] || null,
+      delay: x[side === 'ar' ? 'accountsReceivableDelay' : 'accountsPayableDelay'] || null,
+      account: acct(x[side === 'ar' ? 'accountsReceivableAccount' : 'accountsPayableAccount']),
+      ...(side === 'ap' ? { accrualAccounts: (x.accountsPayableExpenseAccounts || []).map(acct) } : {}) };
+    return { ar: one(c.accountsReceivableForecastingConfiguration, 'ar'), ap: one(c.accountsPayableForecastingConfiguration, 'ap') };
+  };
+  // System Health (the ⚠ next to the plan name): misconfigured drivers and the like, per plan.
+  const getSystemHealth = async (company) => {
+    const [h, ps] = await Promise.all([api('/v1/system-health', company), api('/v1/model/plans', company)]);
+    return (h.issues || []).map(x => { const [kind, d] = Object.entries(x.detail || {})[0] || [null, {}];
+      const pl = ps.find(p => p.planId === x.planId);
+      return { severity: d.severity || null, scope: x.scope || null, plan: pl ? pl.shortName : x.planId || null, kind, message: d.message || null,
+        ...(d.driverId ? { driverId: d.driverId.value, driverScope: d.driverId.scope } : {}) }; });
   };
   // ── navigation ──
   // Jirav's full-screen "Applying changes, this may take a few minutes..." overlay (animated giraffe)
@@ -398,6 +591,17 @@ var jirav = (() => {
   const go = async (path) => {
     const url = new URL(path, location.origin);
     const target = url.pathname + url.search;
+    // An archived (or unknown) plan's URL silently opens another plan: refuse instead.
+    const pm = url.pathname.match(/^\/([^/]+)\/plan\/[^/]+\/([^/]+)(\/|$)/);
+    if (pm) {
+      const co = pm[1] === location.pathname.split('/')[1] ? undefined : pm[1];
+      const active = await listPlans(co).catch(() => null);
+      if (active && !active.some(p => p.planId === pm[2])) {
+        const arch = await listArchivedPlans(co).catch(() => []), a = arch.find(p => p.planId === pm[2]);
+        throw new Error(a ? `"${a.shortName}" is archived: Jirav can't open an archived plan (the URL would land on another plan). Read it before archiving, or make it active first.`
+          : `No active plan "${pm[2]}" (from listPlans): Jirav would open another plan instead.`);
+      }
+    }
     const sameCompany = url.pathname.split('/')[1] === location.pathname.split('/')[1];
     if (!sameCompany) {
       location.assign(target);
@@ -461,14 +665,70 @@ var jirav = (() => {
   // Material icon ligatures ("more_vert", "remove_circle_outline") show up as text: strip words with
   // underscores, and drop labels that are a single lowercase word ("add", "close", "psychology").
   const ICON = /^[a-z]+$/;
+  // Only items of a menu that is really open: closed menus can stay in the DOM with a size (#13), so an
+  // item must have no hidden/transparent ancestor and be what's on top at its own centre. An item
+  // outside the window comes back as {offscreen: true} with no point (#42); one still moving with the
+  // menu's opening animation as {settling: true} (#24): use `await jirav.menu.settled()` instead.
+  const shown = e => {
+    for (let n = e; n && n.nodeType === 1; n = n.parentNode || n.host) {
+      const cs = getComputedStyle(n);
+      if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) === 0 || n.getAttribute('aria-hidden') === 'true') return false;
+    }
+    return true;
+  };
+  const onTop = (e, r) => {
+    let t = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+    while (t && t.shadowRoot) { const d = t.shadowRoot.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); if (!d || d === t) break; t = d; }
+    for (let n = t; n; n = n.parentNode || n.host) if (n === e) return true;
+    for (let n = e; n; n = n.parentNode || n.host) if (n === t) return true;
+    return false;
+  };
+  const moving = e => (document.getAnimations ? document.getAnimations() : []).some(a => a.playState === 'running' && a.effect && a.effect.target
+    && (a.effect.target === e || a.effect.target.contains(e)));
+  // View-only room-making for narrow panes (Cowork ~800 px): collapse Jirav's left sidebar. Nothing is
+  // saved; a reload opens it again. Returns true if it collapsed it.
+  const collapseSidebar = async () => {
+    const c = deepAll(document, 'jirav-ng-expand-collapse-button.m-collapse-direction-left')[0];
+    const b = c && !c.classList.contains('m-collapsed') && c.querySelector('button');
+    if (!b) return false;
+    b.click(); await sleep(800); return true;
+  };
   const menu = () => {
     const sel = '.dropdown-menu li, .dropdown-menu button, .dropdown-panel button, .cdk-overlay-pane button, .cdk-overlay-pane [role=menuitem], ' +
       '[role=menu] [role=menuitem], [role=listbox] [role=option], [role=treeitem], mat-option, .mat-mdc-menu-item, ' +
       '.ag-menu-option, .ag-list-item, .ag-select-list-item, .ui-select-choices-row';
-    const seen = new Set();
-    return deepAll(document, sel).filter(visible)
-      .map(e => ({ label: e.textContent.replace(/\s+/g, ' ').trim().split(' ').filter(w => !/^[a-z]+(_[a-z]+)+$/.test(w)).join(' '), ...at(e) }))
-      .filter(i => i.label && i.label.length < 60 && !ICON.test(i.label) && !seen.has(i.label + i.y) && seen.add(i.label + i.y));
+    const seen = new Set(), out = [];
+    for (const e of deepAll(document, sel)) {
+      if (!visible(e) || !shown(e)) continue;
+      const label = e.textContent.replace(/\s+/g, ' ').trim().split(' ').filter(w => !/^[a-z]+(_[a-z]+)+$/.test(w)).join(' ');
+      if (!label || label.length >= 60 || ICON.test(label)) continue;
+      const r = e.getBoundingClientRect(), cx = r.x + r.width / 2, cy = r.y + r.height / 2;
+      if (cx < 0 || cy < 0 || cx > innerWidth || cy > innerHeight) {
+        // A list that opened past the window: bring the item into view (view-only), then measure again.
+        e.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        const r2 = e.getBoundingClientRect(), x2 = r2.x + r2.width / 2, y2 = r2.y + r2.height / 2;
+        if (x2 < 0 || y2 < 0 || x2 > innerWidth || y2 > innerHeight || !onTop(e, r2)) {
+          if (!seen.has(label + '|off')) { seen.add(label + '|off'); out.push({ label, offscreen: true, reason: 'outside the window even after scrolling: close the menu, scroll the page so its button sits higher, reopen' }); }
+          continue;
+        }
+      }
+      if (!onTop(e, r)) continue;                       // covered, or a closed menu left behind
+      const p = at(e);
+      if (seen.has(label + p.y)) continue; seen.add(label + p.y);
+      out.push(moving(e) ? { label, ...p, settling: true } : { label, ...p });
+    }
+    return out;
+  };
+  // Waits until the open menu's points stop moving (opening animations), then returns menu().
+  menu.settled = async (timeoutMs = 2000) => {
+    const key = m => JSON.stringify(m.map(i => [i.label, i.x, i.y]));
+    let prev = null, t0 = Date.now();
+    while (Date.now() - t0 < timeoutMs) {
+      const m = menu();
+      if (m.length && !m.some(i => i.settling) && prev !== null && key(m) === prev) return m;   // empty = not open yet
+      prev = key(m); await sleep(150);
+    }
+    return menu();
   };
 
   // Drag-reorder among siblings in an Angular CDK drop list or a Muuri grid (custom table rows).
@@ -532,9 +792,9 @@ var jirav = (() => {
   const status = () => 'jirav ' + KIT_VERSION + ' (build ' + KIT_BUILD + ') loaded' + (Object.keys(blocks).length ? '; blocks: ' + Object.keys(blocks).join(', ') : '') + '. ' + JSON.stringify(page());
   const help = () => ({
     core: 'page, listTenants, getTenant, listDashboards, listReports, listReportPages, listPlans, listCustomTables, listPlanDrivers, listGlobalDrivers, ' +
-      'listAssumptions, listDateRanges, listDepartments, listStaff, getChartOfAccounts, getDepartmentMappings, getLimits, listGoals, listUsers, getVarianceRules, getCashFlowSetup, listReportSources, getReportSetup, ' +
+      'listArchivedPlans, getSubscription, listAssumptions, listAssumptionValues, readAuditLog, listDateRanges, listDepartments, listStaff, getChartOfAccounts, getDepartmentMappings, getLimits, listGoals, listUsers, getVarianceRules, getCashFlowSetup, listReportSources, getReportSetup, ' +
       'listDashboardTiles, getTileValues, getDataStatus, getPeriods, getAutoForecast, ' +
-      'go, ready, busy, waitIdle, saveBar, alerts, dismissAlerts, autoDismiss, readTableRows, pageLinks, deepAll, at, menu, drag',
+      'go, ready, busy, waitIdle, saveBar, alerts, dismissAlerts, autoDismiss, readTableRows, pageLinks, deepAll, at, menu, collapseSidebar, drag',
     blocks: Object.fromEntries(Object.keys(blocks).map(b => [b, { summary: blocks[b],
       functions: typeof jirav[b] === 'function' ? [b + '()'] : Object.keys(jirav[b]) }])),
     here: page(),
@@ -542,9 +802,9 @@ var jirav = (() => {
 
   return { version: KIT_VERSION, build: KIT_BUILD, help, status, page,
     listTenants, getTenant, listDashboards, listReports, listReportPages, listPlans, listCustomTables, listPlanDrivers,
-    listGlobalDrivers, listAssumptions, listDateRanges, listDepartments, listStaff, getChartOfAccounts, getDepartmentMappings, getLimits, listGoals, listUsers, getVarianceRules, getCashFlowSetup, listReportSources, getReportSetup,
-    listDashboardTiles, getTileValues, getDataStatus, getPeriods, getAutoForecast, ready, busy, waitIdle, saveBar, alerts, dismissAlerts, autoDismiss, readTableRows, go, pageLinks,
-    deepAll, at, menu, frame, drag, block, _restoreBlocks: restoreBlocks };
+    listGlobalDrivers, listArchivedPlans, getSubscription, listAssumptions, listAssumptionValues, readAuditLog, listDateRanges, listDepartments, listStaff, getChartOfAccounts, getDepartmentMappings, getLimits, listGoals, listUsers, getVarianceRules, getCashFlowSetup, listReportSources, getReportSetup,
+    listDashboardTiles, getTileValues, getDataStatus, getPeriods, getAutoForecast, getArApSettings, getSystemHealth, getCompanySettings, ready, busy, waitIdle, saveBar, alerts, dismissAlerts, autoDismiss, readTableRows, go, pageLinks,
+    deepAll, at, menu, collapseSidebar, frame, drag, block, _restoreBlocks: restoreBlocks };
 })();
 window.jirav = jirav;
 try { localStorage.setItem('jiravKit', '(' + __jiravKit.toString() + ')()'); } catch (e) { /* storage unavailable: re-paste after reloads */ }

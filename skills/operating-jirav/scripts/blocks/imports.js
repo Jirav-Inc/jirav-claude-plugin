@@ -3,7 +3,9 @@
 //
 // Kinds: 'staff' (Workforce → Excel; every plan; replaces the whole staff list),
 //        'customActuals' (Custom Tables → Excel; every plan; only the months in the file),
-//        'budget' / 'customBudget' (Budget cards; one plan; typed values for the cells that have values).
+//        'budget' / 'customBudget' (Budget cards; one plan; typed values for the cells that have values),
+//        'accountingActuals' (Actuals → Accounting → Manual import; GL actuals for a JiravExcel company: every
+//                     plan; the COA tab REPLACES the chart, the IS / BS tabs set the months in the file).
 //   im.template(kind, {planId})   -> {i, name, size}   fetch Jirav's template into the page (budgets: per plan,
 //                                    prefilled with that plan's typed values; staff: the current staff list)
 //   im.fromBase64(b64, name)      -> {i, name, size}   a file built elsewhere (call repeatedly with {append:true}
@@ -14,10 +16,14 @@
 //   im.edit(i, sheet, {E55: 111, F55: null, B7: 'text'}) -> {i, name, size}   a NEW file with those cells changed
 //                                    (null = blank). Everything else in the zip stays byte-identical.
 //   im.blankNumbers(i, sheet, fromRow) -> {i, ...}   new file with every number from that row down blanked
-//   im.upload(kind, i)            -> staff/customActuals: uploads now, waits, returns Jirav's result alert.
+//   im.upload(kind, i, opts?)     -> staff/customActuals/accountingActuals: uploads now, waits, returns Jirav's result alert
+//                                    (refuses if the card is disabled; accountingActuals: opts {firstImport, removes}).
 //                                    budgets: arms the file and opens Import Budget Data; then ONE real click
 //                                    inside the dialog (it waits for a user event), then:
 //   im.finish(planName)           -> budgets: picks the plan, presses UPLOAD TEMPLATE, returns the result
+//   im.accountingCheck(i)         -> accountingActuals: {source, months, accounts, removes, adds, emptyTabs}
+//                                    removes = Jirav accounts the file's COA leaves out (deleted from EVERY month)
+//   im.dropSheets(i, [names])     -> {i, ...}   new file without those tabs (an empty optional tab fails the import)
 //   im.result()                   -> the last alerts (jirav.alerts())
 //   im.list(), im.readBase64(i, {offset, length})   files held here / move one into Claude's workspace
 if (typeof jirav === 'undefined') throw new Error('Paste scripts/jirav.min.js (the core) first.');
@@ -30,17 +36,51 @@ jirav.block('imports', 'dev', (jirav) => {
     customActuals: { card: 'customLines', template: () => '/v1/import/customLines/file/template/xlsx' },
     budget: { card: 'budgets', plan: true, template: p => `/v1/import/budget/file/template/xlsx/plan/${p}` },
     customBudget: { card: 'customLinesBudget', plan: true, template: p => `/v1/import/customLines/budget/file/template/plan/${p}` },
+    // Jirav's GL actuals template is a static, BLANK file (not prefilled), one of three versions chosen by company
+    // features, exactly as the card's Template link chooses it. For monthly imports start from the user's last file.
+    accountingActuals: { card: 'accounting-manual', external: true },
+  };
+  const HUB = 'https://2567042.fs1.hubspotusercontent-na1.net/hubfs/2567042/';
+  const accountingTemplateUrl = async () => {
+    const t = await jirav.getTenant(), f = await (await fetch(t.base + '/v1/config/features', { credentials: 'include' })).json();
+    return f.categoryDimensionInBS ? HUB + 'Excel%20Import%20Templates/Excel_Accounting_Import_Template_v1.2.xlsx'
+      : f.categoryDimensionRenaming ? HUB + 'Excel%20Import%20Templates/Excel_Accounting_Import_Template_v1.1.xlsx'
+      : HUB + 'Excel%20Import%20Template/Excel%20Accounting%20Import%20Template.xlsx';
+  };
+  // GL actuals by Excel only where the company's accounting source is JiravExcel, or where there is none yet (the
+  // first import then MAKES JiravExcel the source, and only Jirav support can change it back). With a connector
+  // selected the card is disabled: actuals come from that system.
+  const accountingSource = async () => {
+    const a = ((await jirav.getDataStatus()) || {}).accounting || {};
+    if (a.source && a.source !== 'JiravExcel') throw new Error(`This company's actuals come from ${a.source}: they can't be imported from Excel (the Manual import card is disabled). Change them in ${a.source} and import there.`);
+    return a.source || null;
   };
   const kindOf = k => { const x = KINDS[k]; if (!x) throw new Error(`Unknown kind "${k}": ${Object.keys(KINDS).join(', ')}.`); return x; };
   const keep = (blob, name) => { st.files.push({ name, blob, at: new Date().toISOString() }); const i = st.files.length - 1; return { i, name, size: blob.size }; };
   const pick = i => { const f = st.files[i == null ? st.files.length - 1 : i]; if (!f) throw new Error(`No file ${i}; list() shows what is held.`); return f; };
   const list = () => st.files.map((f, i) => ({ i, name: f.name, size: f.blob.size, at: f.at }));
 
+  // Staff can be uploaded from Excel unless an HR system is connected (e.g. "rippling-api"): then the staff
+  // come from that system. With none connected Jirav reports no source (null) and offers the Excel card,
+  // whether or not a list was ever imported.
+  const staffSource = async () => {
+    const src = ((await jirav.getDataStatus()) || {}).workforce || {};
+    if (src.source && src.source !== 'Excel file') throw new Error(`This company's staff come from ${src.source}, so they can't be uploaded from Excel: change them in that system.`);
+    return src;
+  };
   const template = async (kind, { planId } = {}) => {
     const k = kindOf(kind);
+    if (kind === 'staff') await staffSource();
+    if (kind === 'accountingActuals') {
+      await accountingSource();
+      const url = await accountingTemplateUrl(); let r;
+      try { r = await fetch(url); } catch (e) { throw new Error(`Template download failed (${e.message}): ask the user to download it from the Manual import card's Template link and attach it, then fromBase64.`); }
+      if (!r.ok) throw new Error(`Template download failed: ${r.status}. Ask the user for the file from the card's Template link.`);
+      return keep(new Blob([await r.arrayBuffer()], { type: XLSX }), 'accountingActuals-template.xlsx');
+    }
     if (k.plan && !planId) throw new Error(`template('${kind}') needs {planId} (jirav.listPlans()).`);
     const t = await jirav.getTenant();
-    const noStaff = 'The staff template fails when the company has no staff yet: build the file from the column list in references/imports.md and use fromBase64.';
+    const noStaff = 'The staff template can\'t be fetched by script when the company has no staff list yet (it redirects to a download): build the first file from the column list in references/imports.md and use fromBase64.';
     let r;
     try { r = await fetch(t.base + k.template(planId), { credentials: 'include' }); }
     catch (e) { throw new Error(kind === 'staff' ? noStaff : `Template request failed: ${e.message}`); }
@@ -137,6 +177,7 @@ jirav.block('imports', 'dev', (jirav) => {
         let val = v ? v.textContent : (is ? is.textContent : null);
         if (t === 's') val = ss[+val]; else if (val != null && val !== '' && t !== 'str' && t !== 'inlineStr' && !isNaN(+val)) val = +val;
         if (typeof val === 'number' && ds.has(c.getAttribute('s'))) val = ymd(val);  // a date cell → 'YYYY-MM-DD'
+        if (typeof val === 'string' && /^-?\d+\.\d+$/.test(val)) val = +val;            // stored values come as text ("15.00000")
         cells[ref.replace(/\d+$/, '')] = val === '' ? null : val;
       }
       out.push({ r: +r.getAttribute('r'), cells });
@@ -151,7 +192,17 @@ jirav.block('imports', 'dev', (jirav) => {
   const monthColumn = async (i, sheet, month, headerRow) => {
     const rs = await rows(i, sheet), want = String(month).slice(0, 7);
     for (const r of rs) { if (headerRow && r.r !== headerRow) continue; for (const [c, v] of Object.entries(r.cells)) if (typeof v === 'string' && v.slice(0, 7) === want) return c; }
-    throw new Error(`No column for ${want} (budget templates hold forecast months only).`);
+    // Not there: say where the header is and how to add the month (budget templates only hold the plan's
+    // forecast months; the custom-actuals header only spans months that hold data, up to today).
+    const isMonth = v => typeof v === 'string' && /^\d{4}-\d{2}/.test(v);
+    const hdr = rs.filter(r => !headerRow || r.r === headerRow).find(r => Object.values(r.cells).some(isMonth));
+    if (!hdr) throw new Error(`No month header found${headerRow ? ' in row ' + headerRow : ''}.`);
+    const months = Object.entries(hdr.cells).filter(([, v]) => isMonth(v)), colN = c => [...c].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0);
+    const last = months.sort((a, b) => colN(a[0]) - colN(b[0]))[months.length - 1];
+    const toCol = n => { let c = ''; for (; n > 0; n = Math.floor((n - 1) / 26)) c = String.fromCharCode(65 + (n - 1) % 26) + c; return c; };
+    const next = toCol(colN(last[0]) + 1);
+    throw new Error(`No ${want} column: the header (row ${hdr.r}) runs ${months[0][1].slice(0, 7)} … ${last[1].slice(0, 7)}. ` +
+      `For custom actuals, add it with edit {${next}${hdr.r}: '${want}-01'} and use column ${next}; for a budget, the month must be in the plan's forecast.`);
   };
   const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const cellXml = (ref, style, v) => {
@@ -213,8 +264,25 @@ jirav.block('imports', 'dev', (jirav) => {
       setTimeout(() => this.dispatchEvent(new Event('change', { bubbles: true })), 50);
     };
   };
-  const upload = async (kind, i) => {
+  // A blank point in the dialog body: just above its button row (the dialog's centre can be text).
+  const blankIn = dlg => {
+    const d = dlg.getBoundingClientRect(), b = [...dlg.querySelectorAll('button')].filter(x => x.getBoundingClientRect().height)
+      .map(x => x.getBoundingClientRect()).sort((p, q) => q.top - p.top)[0];
+    const y = b ? b.top - 20 : d.bottom - 80, x = d.left + d.width * 0.5, k = jirav.frame.width / innerWidth;
+    return { x: Math.round(x * k), y: Math.round(y * k) };
+  };
+  const upload = async (kind, i, opts = {}) => {
+    if (kind === 'staff') await staffSource();
     const k = kindOf(kind), f = pick(i), file = new File([f.blob], f.name, { type: XLSX }), btn = card(k), since = new Date().toISOString();
+    // Never act through a control the page has disabled: the scope call below would bypass it.
+    if (btn.disabled) throw new Error(`The ${k.card} card's Import button is disabled for this user or company: don't import; say why it's off.`);
+    if (kind === 'accountingActuals') {
+      const c = await accountingCheck(i == null ? st.files.length - 1 : i);
+      if (c.emptyTabs.length) throw new Error(`Tabs ${c.emptyTabs.join(', ')} have no rows, which fails the import: fill them or dropSheets(i, ${JSON.stringify(c.emptyTabs)}).`);
+      if (!c.source && !opts.firstImport) throw new Error('No accounting source yet: this import makes Excel the actuals source for good (only Jirav support can change it). Tell the user, get a yes, then upload(kind, i, {firstImport: true}).');
+      const same = (a, b) => a.length === b.length && a.every(x => b.includes(x));
+      if (c.removes.length && !same(c.removes, opts.removes || [])) throw new Error(`The file's COA leaves out ${c.removes.join(', ')}: they'd be deleted from every month. If the user means that, name them and pass {removes: ${JSON.stringify(c.removes)}}; otherwise add them to the COA tab.`);
+    }
     if (!k.plan) {
       const sc = angular.element(btn).scope(); sc.$apply(() => sc.provider.uploadFile(file));
       const a = await waitAlert(since); return a.length ? { uploaded: f.name, result: a } : { uploaded: f.name, result: [], note: 'No alert after 30 s: check the page.' };
@@ -222,7 +290,7 @@ jirav.block('imports', 'dev', (jirav) => {
     armClick(); st.pending = file; jirav.dismissAlerts(); btn.scrollIntoView({ block: 'center' }); btn.click();
     await new Promise(r => setTimeout(r, 1500));
     const dlg = jirav.deepAll(document, 'mat-dialog-container')[0];
-    return { armed: f.name, clickInside: dlg ? jirav.at(dlg) : null,
+    return { armed: f.name, clickInside: dlg ? blankIn(dlg) : null,
       next: 'Real-click inside the dialog once (it shows a spinner until a real click), then im.finish(planName).' };
   };
   // Budgets, after the real click: pick the plan, press UPLOAD TEMPLATE, wait for Jirav's result.
@@ -240,5 +308,42 @@ jirav.block('imports', 'dev', (jirav) => {
     const since = new Date().toISOString(); up.click();
     const a = await waitAlert(since); return { ok: a.some(x => x.startsWith('success')), result: a };
   };
-  return { template, fromBase64, rows, findRow, monthColumn, edit, blankNumbers, upload, finish, result, list, readBase64 };
+  // GL actuals file vs what Jirav holds. Accounts compare by name (unique in a Jirav chart; the API doesn't expose
+  // the file's Account IDs in auto mapping). Retained Earnings / Unmapped are Jirav's own and never "removed".
+  const accountingCheck = async i => {
+    const o = await open(i), names = o.sheets.map(x => x.name), find = re => names.find(n => re.test(n.trim()));
+    const tab = { coa: find(/^COA$|^chart of accounts$/i), is: find(/^income statement$/i), bs: find(/^balance sheet$/i),
+      setup: find(/^company setup$/i), deps: find(/^departments$|^categories$/i) };
+    for (const [k, n] of Object.entries({ COA: tab.coa, 'Income Statement': tab.is, 'Balance Sheet': tab.bs })) if (!n) throw new Error(`The file has no ${k} tab: every import needs COA, Income Statement and Balance Sheet.`);
+    // Data starts on row 5 in columns A-E; the template's help notes sit further right.
+    const filled = v => v != null && v !== '';
+    const dataRows = async n => (await rows(i, n)).filter(r => r.r >= 5 && ['A', 'B', 'C', 'D', 'E'].some(c => filled(r.cells[c])));
+    const coa = (await dataRows(tab.coa)).filter(r => filled(r.cells.A)).map(r => ({ id: String(r.cells.A), name: r.cells.C }));
+    const months = new Set();
+    for (const [n, col] of [[tab.is, 'C'], [tab.bs, 'B']]) (await dataRows(n)).forEach(r => { const v = r.cells[col]; if (v) months.add(String(v).slice(0, 7)); });
+    const emptyTabs = [];
+    for (const n of [tab.setup, tab.deps].filter(Boolean)) if (!(await dataRows(n)).length) emptyTabs.push(n);
+    const jirav0 = (await jirav.getChartOfAccounts()).flatMap(sec => sec.accounts.map(a => a.name)).filter(n => !/^(Unmapped|Retained Earnings)$/i.test(n));
+    const fileNames = coa.map(a => a.name);
+    return { source: await accountingSource(), months: [...months].sort(), accounts: coa.length,
+      removes: jirav0.filter(n => !fileNames.includes(n)), adds: fileNames.filter(n => !jirav0.includes(n) && !/^Retained Earnings$/i.test(n)), emptyTabs };
+  };
+  // A copy of file i without the named tabs (workbook, its rels and content types updated).
+  const dropSheets = async (i, drop) => {
+    const o = await open(i), gone = o.sheets.filter(x => drop.includes(x.name));
+    if (gone.length !== drop.length) throw new Error(`No tab named ${drop.filter(n => !gone.some(g => g.name === n)).join(', ')}; tabs: ${o.sheets.map(x => x.name).join(', ')}.`);
+    const paths = gone.map(g => g.path), rel = p => p.replace(/^xl\//, '');
+    let wb = await o.get('xl/workbook.xml'), wr = await o.get('xl/_rels/workbook.xml.rels'), ct = await o.get('[Content_Types].xml');
+    for (const g of gone) wb = wb.replace(new RegExp(`<sheet [^>]*name="${g.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*/>`), '');
+    wb = wb.replace(/<definedNames>[\s\S]*?<\/definedNames>/, '');
+    for (const p of paths) { wr = wr.replace(new RegExp(`<Relationship [^>]*Target="(/xl/)?${rel(p)}"[^>]*/>`), ''); ct = ct.replace(new RegExp(`<Override PartName="/${p}"[^>]*/>`), ''); }
+    const ents = [];
+    for (const e of o.ents) {
+      if (paths.includes(e.name) || paths.some(p => e.name === p.replace(/([^/]+)$/, '_rels/$1.rels'))) continue;
+      const data = e.name === 'xl/workbook.xml' ? wb : e.name === 'xl/_rels/workbook.xml.rels' ? wr : e.name === '[Content_Types].xml' ? ct : null;
+      ents.push({ name: e.name, data: data != null ? new TextEncoder().encode(data) : await inflate(e) });
+    }
+    return keep(await zip(ents), o.f.name.replace(/(\.xlsx)?$/, '-trimmed.xlsx'));
+  };
+  return { template, fromBase64, rows, findRow, monthColumn, edit, blankNumbers, accountingCheck, dropSheets, upload, finish, result, list, readBase64 };
 }, 'Excel imports without the file chooser: templates, in-page cell edits, upload (CHANGES DATA)');

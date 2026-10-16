@@ -24,7 +24,11 @@ The app's defaults for a new company: COGS, OpEx, Other Expense and Liabilities 
 rest = Increase, thresholds 0 (from the app source; companies change them).
 
 Columns: Data Element, Favorable Trend, Materiality Threshold. **ADD RULE** opens the [variable picker](variable-picker.md)
-to choose the line; row ⋮: Edit Rule, Add Exception, Delete Rule. Saving not tested.
+to choose the line; row ⋮: Edit Rule, Add Exception, Delete Rule. **Edit Rule** opens a dialog:
+Favorable Trend (Increase is Favorable / Decrease is Favorable / Ignore Trend), Materiality
+Threshold (Variance % · AND/OR · Variance #) → **SAVE** saves the rule at once (verified, then set
+back). Under OR, a non-zero % with a zero # (or the reverse) counts as 0% OR $0, so every change
+is material; the dialog warns about it.
 
 ## Cash Flow (`/<tenant>/setup/cash-flow`)
 
@@ -35,4 +39,9 @@ Investing / Financing radio buttons (Account Classification). Drives the Cash Fl
 await jirav.getCashFlowSetup()  // [{key, name, parent, activity: 'operating'|'investing'|'financing'}]
 ```
 
-Saving not tested.
+As seen in the companies checked: liabilities (long term included, so notes payable and lines of
+credit too) are Operating, fixed assets and accumulated depreciation Investing, equity Financing.
+Loans often end up in Operating: see the checks in
+[burn-and-runway.md](finance/burn-and-runway.md#sanity-checks-on-the-cash-flow).
+
+**Each radio button saves at once** (no Save or confirmation; verified, and reverted the same way): company-wide, so confirm before clicking, and read `getCashFlowSetup()` after.

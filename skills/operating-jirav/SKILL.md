@@ -40,7 +40,7 @@ They don't save: you click, type and Save at the coordinates they return (`jirav
 - **Start every browser call with the restore line.** It reloads the kit cached in this browser
   (across reloads, tabs and sessions) while the files here are unchanged:
   ```js
-  location.host !== 'app.jirav.com' ? 'WAIT: on '+location.host+', not app.jirav.com yet: retry in a few seconds' : (typeof jirav !== 'undefined' && jirav.build === '928ba45c') ? jirav.status() : (localStorage.jiravKit || '').includes("KIT_BUILD='928ba45c'") ? (0, eval)(localStorage.jiravKit) : 'PASTE scripts/jirav.min.js (not cached in this browser, or out of date)'
+  location.host !== 'app.jirav.com' ? 'WAIT: on '+location.host+', not app.jirav.com yet: retry in a few seconds' : (typeof jirav !== 'undefined' && jirav.build === '8038ac4c') ? jirav.status() : (localStorage.jiravKit || '').includes("KIT_BUILD='8038ac4c'") ? (0, eval)(localStorage.jiravKit) : 'PASTE scripts/jirav.min.js (not cached in this browser, or out of date)'
   ```
 - **PASTE**: paste the whole of `scripts/jirav.min.js` with `javascript_tool` on any app.jirav.com page (even
   the company picker). `scripts/jirav.js` is the readable, documented source: read it, don't paste it.
@@ -48,6 +48,12 @@ They don't save: you click, type and Save at the coordinates they return (`jirav
   reference asks; the restore line brings them back afterwards. `grid-values` (`readGridValues`),
   `custom-table-structure`, `dashboard-layout`, `exports` (no save prompt), `imports` (no file chooser).
 - A documented function is missing: paste the core, then the block.
+- **Menus:** after opening one, read it with `await jirav.menu.settled()`: it waits for the opening
+  animation, and returns only the menu that's really open.
+- **Narrow panes** (Cowork's is ~800 px): the helpers make room themselves, view-only. `cellPoint`
+  collapses Jirav's left sidebar and narrows pinned columns (the user's saved widths are kept); the
+  dashboard helpers scroll and move in steps (`partial`). **Never ask the user to resize the pane.**
+  A result with `offscreen: true` gives no point: follow its `reason` (scroll, close a panel), retry.
 
 ## Where to look
 
@@ -67,10 +73,12 @@ Facts marked *(help)* come from Jirav's help articles and haven't been tested: c
 | Dashboards and tiles, moving / resizing tiles | `dashboards.md` |
 | Export to Excel / PDF / CSV without a save prompt | `exports.md` |
 | Import from Excel: budgets, staff list, custom-table actuals | `imports.md` |
+| GL actuals from Excel (companies on JiravExcel) | `excel-actuals.md` |
 | Where actuals come from, last sync, close month | `integrations.md` |
 | Settings: company (close month, fiscal year, labels) / goals / variance rules and cash flow / users, roles, Audit Log | `company-settings.md` / `goals.md` / `variance-and-cash-flow-settings.md` / `users-and-audit-log.md` |
 | Chart of Accounts / Departments / Date ranges / Auto-Forecast method | `chart-of-accounts.md` / `departments.md` / `date-ranges.md` / `forecast-settings.md` |
 | Logging every edit to `jirav/YYYY-MM-DD.csv` on the user's computer | `build-log.md` |
+| Analysis: which plan is the budget, variances, burn / runway / cash flow | [plan-roles.md](references/finance/plan-roles.md) / [variance-analysis.md](references/finance/variance-analysis.md) / [burn-and-runway.md](references/finance/burn-and-runway.md) |
 | Anything else | `discovering-endpoints.md` |
 
 ## Before any change
@@ -123,7 +131,8 @@ Mistakes change a customer's financial model. For every change:
 - Filter grid reads (`under`, `match`, `maxDepth`, `from`/`to`, `kind`): a full plan page is ~50 KB.
 - Report values with period, plan or report, department, and actual vs forecast.
 - Screenshots are small (≈800×500) and much of the app isn't in the accessibility tree: use kit
-  coordinates or the latest screenshot.
+  coordinates or the latest screenshot. After any reload or navigation, take points again: a
+  reload re-opens a collapsed sidebar, so earlier points are off.
 - Leave the browser tidy: reset filters you changed and say which page the tab is on.
 - Flag anomalies (sign flips, outliers, a report sourcing a deleted plan, a plan name that
   contradicts its cutover). Report them; don't "fix" them.

@@ -10,13 +10,18 @@ every change, follow **Edits** in SKILL.md.
 ```js
 await jirav.listDashboards()                    // [{id, name, position}] position 1 = default
 await jirav.listDashboardTiles(dashboardId)     // [{id, kind: CHART|TEXT, title, chart, source, compareTo, range, frequency}]
-await jirav.getTileValues(dashboardId, tileId)  // {title, periods, rows: [[label, ...values]], overlay?}
+await jirav.getTileValues(dashboardId, tileId)  // {title, periods, columns?, rows: [[label, ...values]], overlay?}  tileId: the id, or the tile's exact title
 ```
 
 Tiles are charts, so `jirav.readGridValues()` can't read them. `getTileValues` returns the numbers
 behind a chart tile (e.g. Balance Sheet: Assets / Liabilities / Equity by month, overlay Cash On
 Hand). `NUMBER` tiles have one `TOTAL` period such as `2026-07..2026-09`; percentages come back
-as fractions (0.5786 = 58%). Text tiles have no values.
+as fractions (0.5786 = 58%). **With a comparison on**, each period comes back four times, and
+`columns` says which is which: `value, compare, delta, deltaPct` (a "Cash vs Last Month" tile:
+1,200 / 1,250 / −50 / −0.04). A dashboard page inside a report: its id is
+`listReportPages(...).dashboardId`. Text tiles have no values (and often `title: null`): their content
+comes back as plain text in `listDashboardTiles(...).text` and `getTileValues` → `{title, text}`
+(pictures as "[image]").
 
 ## Open
 
@@ -34,7 +39,8 @@ as fractions (0.5786 = 58%). Text tiles have no values.
 | **Share & Export → Export as PDF** | See [exports.md](exports.md) | |
 
 **Edit Tile** (full-screen editor; **SAVE** / **CANCEL** top right): Tile Name; type (Vertical
-Bar, Line, Horizontal Bar, Number, Table, Stacked Vertical Bar, Donut); Tile Data: Primary Source,
+Bar, Line, Horizontal Bar, Number, Table, Stacked Vertical Bar, Donut); Tile Data: Primary Source
+(Actuals, each active plan, Current PoR, and **Goals**: unlike report columns, tiles can show goals),
 Comparison Source, Selection Type (Data Series / Dimensions), data series list (⋮ per series,
 **ADD DATA SERIES**); Overlay line; Time: Date Range (company ranges), Show Dates, Show Actuals
 Until; Data Display options. The preview's **Data** tab shows the tile's numbers as a table.
@@ -62,9 +68,14 @@ await jirav.dashboardLayout.resizeTilePoints('Revenue', 4, 2)    // drag the til
 - Tiles **float up**; dropping a tile on a same-size tile swaps them, and on others pushes them, so
   one drag can move several. Wait ~2 s, then check `listDashboardTiles` (the saved layout, not just
   `tiles()`) and report the whole new layout. Undo: drag tiles back to the recorded positions,
-  top-left first.
+  top-left first. A resize pushes tiles below it down; shrinking it back usually floats them back,
+  but record the layout (or clone the dashboard) first.
 - Titles repeat? Pass `{row, col}` from `tiles()` instead of the title. Points are screenshot pixels.
-- Drag a tile anywhere on its body (not the ⋯). Both points must be on screen: scroll first.
+- Drag a tile anywhere on its body (not the ⋯). `moveTilePoints` / `resizeTilePoints` scroll the
+  dashboard so both points are on screen (in a narrow pane the grid is wider than the window). A
+  move or resize too long for one screen comes back with `partial: true`: drag it, wait ~2 s, and call
+  again with the same target until it comes back without `partial` (tested at 800 px: a tile moved
+  from column 6 to 0 in two drags).
 - **Growing a tile past the bottom of the screen:** the page only scrolls as far as the grid
   reaches. Drag the corner handle ~10 px down (it rounds up: +1 row), scroll down, repeat.
 - Resizing rounds up to whole cells; `resizeTilePoints` already aims for that.

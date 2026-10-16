@@ -53,8 +53,21 @@ Opened from a driver input's **Range** (Time Options), in plan or global drivers
   - Trailing 3 / 6 / 12 months;
   - −1 | +1, −3 | +3, −6 | +6 months.
 - **Custom ranges** are in a scrolling list. Hover one to see its dates and definition, plus
-  **EDIT / REMOVE**. REMOVE asks "Are you sure?" without naming the range, but the range you
-  hovered stays highlighted.
+  **EDIT / REMOVE**. REMOVE asks "Are you sure? Do you want to delete this custom range?" without
+  naming the range (the one you hovered stays highlighted), and deletes it **for the whole company**.
+- Top: **START MONTH / END MONTH** selectors. Bottom: **Save / Discard**. Clicking a range only
+  highlights it; **Save** keeps it (a multi-month range then shows **Reduction**, default Sum).
+  **Escape or Discard** closes the picker and puts the previous range back.
+
+**Clicking safely in the picker** (tested): it opens **under the mouse**, so the pointer can already
+be over a custom range with its REMOVE showing, and a script click on a REMOVE opens the delete
+confirm at once.
+- Before any click, move the pointer off the custom-range list.
+- Click a range by its label, from a screenshot. Never click near EDIT / REMOVE unless the user asked
+  to edit or delete that range; never click REMOVE by index (there's one per custom range).
+- Verify any change with `listDateRanges()`.
+- The open picker doesn't refresh: a range you just created doesn't appear, and one you deleted
+  still shows, until you Discard and reopen it.
 
 ## Add a custom range
 
@@ -63,9 +76,10 @@ Opened from a driver input's **Range** (Time Options), in plan or global drivers
 - **Name.**
 - **Start:** Auto, Current Month / Quarter Start / Half Start / Fiscal Year Start, or Close Month /
   Quarter Start / Half Start / Fiscal Year Start.
-- **Width.**
+- **Width:** Auto, 1–6 Months, or type a number. It counts forward from Start.
 - **End:** Auto.
 - **Start Shift / End Shift:** −6…+6 months, or hover "0 Months ›" and type any number (e.g. −12).
 
 **Save stores it for the whole company immediately**, before the driver is saved. Confirm
-first, and give it a clear name.
+first, and give it a clear name. The header previews its dates (e.g. "FEB – APR 2026"); Escape
+on the form discards it.

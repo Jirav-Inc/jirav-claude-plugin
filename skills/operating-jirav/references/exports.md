@@ -21,10 +21,16 @@ that blocks the browser: if that happens, ask them to Cancel it, capture, and ex
 
 ## 2. Export
 
+**First check the page covers what the user asked.** A report page's columns follow its own range:
+one "IS by Department" page exported **Jan – Feb '26 vs Jan – Feb '25** (year to date), not last month.
+Read `jirav.getReportSetup(reportId)` → the page's `groups[].range` / `rangeDates` and compare them
+with the ask (a month, quarter, YTD, trailing 12). If they differ, say so and offer a page that
+matches, a plan page with the Department filter, or `readGridValues`. State the period in the result.
+
 | From | Click | File caught |
 |---|---|---|
 | One report page | Page title ⋮ → **Export as Excel** | `<Page>.xlsx`, one sheet |
-| Whole package | **Share & Export → Export as Excel** | `<Package>.xlsx`, one sheet per page (Index first) |
+| Whole package | **Share & Export → Export as Excel** | `<Package>.xlsx`, one sheet per page (Index first). **Dashboard pages are left out**, and `/` in a page name becomes `_` ("A_R Aging Summary"): match sheets to pages that way |
 | Whole package | **Share & Export → Export as PDF** → preview → **EXPORT** → *Select Reports for Download* (tick pages) → **Download** | `<Package>.pdf` |
 | Dashboard | **Share & Export → Export as PDF** → preview → **EXPORT** | `<Dashboard>.pdf` |
 | A plan grid | Right-click a cell → **Export** → CSV Export / **Excel Export** | `<Page>.xlsx` (e.g. `Operating Expenses.xlsx`, 11 KB) |
@@ -58,6 +64,10 @@ await jirav.exports.readXlsx(i, {formulas: 'text'}) // formulas as "=…" instea
   SUBTOTAL(9) so the totals match the page.
 - Rows follow the sheet's layout: company name, page title, blank rows, a header row (`Account`,
   source), a period row (`Jan-26`, …), then accounts with `Subtotal …` / `Total …` lines.
+  A **by-department page** differs: after the blank rows comes a **department row** (one name per
+  column group), then one row with `Account` and the period labels ("Jan - Feb '26").
+- **A plan grid export** has `Account, Department, <months>` and no actual / forecast marker: take
+  that from `jirav.getPeriods(planId)`.
 - For plain numbers by period, `jirav.readGridValues()` on the page is often simpler. Export when
   you need every page of a package at once, the exact layout, or the file itself.
 
@@ -73,7 +83,8 @@ await jirav.exports.readXlsx(i, {formulas: 'text'}) // formulas as "=…" instea
 
 The bytes pass through the conversation, so size matters. Excel exports are small (a page 4–20 KB,
 a 10-page package ~20 KB). PDFs are not (a dashboard 160 KB, a 10-page package 770 KB): never
-move a PDF to get numbers, only when the user needs that PDF.
+move a PDF to get numbers, only when the user needs that PDF. Over ~1 MB (a large package PDF is
+several MB, dozens of reads), don't move it: export fewer pages, or summarize from the page.
 
 ## Notes
 

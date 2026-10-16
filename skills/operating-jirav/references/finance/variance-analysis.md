@@ -1,17 +1,23 @@
 # Variance analysis
 
 Comparing actuals with a budget, forecast or prior period. Reading the values (fractions, group
-rows, FY columns): `operating-jirav` → [reading-grid-values.md](../operating-jirav/references/reading-grid-values.md).
+rows, FY columns): `operating-jirav` → [reading-grid-values.md](../reading-grid-values.md).
 
 ## Direction: the company's Variance Rules
 
 Whether a variance is favourable is the company's setting, not a fixed rule. Read it with
 `jirav.getVarianceRules()` (`operating-jirav` →
-[variance-and-cash-flow-settings.md](../operating-jirav/references/variance-and-cash-flow-settings.md)):
+[variance-and-cash-flow-settings.md](../variance-and-cash-flow-settings.md)):
 one rule per line (`revenue`, `cogs`, `opex`, `gross_margin`, `operating_income`, `net_income`, cash
 lines, custom lines), each `favorable`: POSITIVE, NEGATIVE or IGNORE.
 
-- Label a variance favourable or unfavourable by its line's rule, so you agree with Jirav's reports.
+- Label a variance favourable or unfavourable by its line's rule, applied to **the Δ's own direction**:
+  the rule says which sign of Δ is good, and each report group's formula decides the sign
+  (`getReportSetup` → `variance.formula`, per section: e.g. expense Δ = Budget − Actuals, or
+  Actuals − Budget). Read both before calling anything over or under, and never from the sign or
+  colour alone. If a group's expense formula and the COGS/OpEx rule disagree, its colours are
+  inverted (an overspend shows green): say so. Reports colour variances only if the package's
+  **Format** panel has "Show Favorable / Unfavorable Variances As" set (from the app source; not opened).
 - For an account without its own rule, use its section's rule (an account in OpEx follows `opex`) and
   say you did: that's an inference, not a Jirav setting.
 - IGNORE: give the variance, no favourable/unfavourable label.

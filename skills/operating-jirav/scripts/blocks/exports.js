@@ -43,7 +43,9 @@ jirav.block('exports', 'dev', (jirav) => {
   const wait = async (timeoutMs = 20000) => {     // after clicking Export: the first file caught since the last wait() returned one
     const from = (st.seen == null ? -1 : st.seen) + 1, t0 = Date.now();
     while (Date.now() - t0 < timeoutMs) {
-      if (st.files.length > from) { st.seen = st.files.length - 1; st.stale = false; return list()[st.seen]; }
+      // The next file not yet returned (two exports caught before one wait(): the first now, the second next time).
+      if (st.files.length > from) { st.seen = from; st.stale = false; const more = st.files.length - from - 1;
+        return more ? { ...list()[from], waiting: more } : list()[from]; }
       await new Promise(r => setTimeout(r, 300));
     }
     st.stale = true;                              // until a wait() succeeds, reads need an explicit index

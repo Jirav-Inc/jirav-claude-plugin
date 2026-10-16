@@ -1,11 +1,13 @@
 ---
 name: budget-import
-description: Loads an annual budget into a Jirav plan from Excel through Jirav's Budget Import template - by department, without double-counting payroll when System Salaries already exist, and without wiping Balance Sheet balances - then verifies it. Use when the user asks to "import a budget", "load the budget from Excel", "put this budget in Jirav", "upload next year's budget", or needs budget numbers in a plan during account setup or for a demo account.
+description: Takes the budget file a user provides (Excel or CSV, in their own layout) and loads it into a Jirav plan through Jirav's Budget Import template - mapped by account and department, without double-counting payroll when System Salaries already exist, and without wiping Balance Sheet balances - then verifies it. Use when the user asks to "import a budget", "load the budget from Excel", "put this budget in Jirav", "upload next year's budget", or hands over a budget file during account setup.
 ---
 
 # Jirav Budget Import
 
-Loads an annual budget into a Jirav plan through Settings → Integrations → Budget → Excel Budget Import. The budget is the forward-looking core of a Jirav account, so it should land cleanly, by department, without double-counting payroll or disturbing the Balance Sheet.
+Takes the user's budget file and loads it into a Jirav plan through Settings → Integrations → Budget → Excel Budget Import. The budget is the forward-looking core of a Jirav account, so it should land cleanly, by department, without double-counting payroll or disturbing the Balance Sheet.
+
+**The numbers always come from the user's file.** Never invent, extrapolate or "fill in" budget values. No file, no import: ask for it. A line or month the file doesn't have stays blank, and you say so.
 
 Runs on top of the `operating-jirav` skill: use its kit (the restore line, the `jirav.imports` block, `readGridValues`, `listPlanDrivers`) and its Edits rules (propose once, get an explicit yes, verify, log). The user signs in; never type credentials.
 
@@ -13,18 +15,19 @@ Runs on top of the `operating-jirav` skill: use its kit (the restore line, the `
 
 - "Import a budget", "load the budget from Excel", "put this budget in Jirav"
 - Account setup, right after: cash account, departments, staff roster, workforce → master department mapping, System Salary account, and the budget plan window
-- Building a demo or training account with made-up budget numbers
+- The user attaches or points to a budget file (attached in the chat, or in a connected folder)
 
 ## 1. Lay of the land (read-only)
 
 1. **Target plan.** Use `jirav.listPlans()` and `jirav.getPeriods(planId)`.
    - The forecast window should be the 12 months of the fiscal year being budgeted. If the budget covers only part of the window, fill only those months (blank Income Statement cells change nothing) and say which months stay unbudgeted.
    - The plan must be editable.
-   - Check `getAutoForecast(planId).plan.enabled`. A budget plan normally has Auto-Forecast off: while it's on, it hides typed values and drivers on accounts inside a group (the elimination driver and imported budget values included), adds to them on top-level accounts, and zeroes System Salaries.
-2. **Departments.** Use `jirav.listDepartments()` and `getDepartmentMappings()`. The template has one row per account × master department, so departments must be set before the import.
-3. **Where the prior-year actuals sit.** On each plan page (Revenue, COGS, OpEx, Other), read the prior fiscal year by account, switching the page's Department filter to each department.
-   - Revenue, COGS and Other often sit in one department (Unassigned, or wherever the company maps unassigned GL activity); OpEx sits by department. Read where they are; don't assume.
-   - The filter is sticky across plans: note its value first and restore it afterwards.
+   - **Which plan, by subscription** (`await jirav.getSubscription()`):
+     - **Controller Essentials** has one budget plan and can't add plans. Loading next year's budget into it **overwrites this year's**, and the rest of this year's budget vs actual is lost. Say so first, and offer to export the current budget (a plan-grid Excel export, [exports.md](../operating-jirav/references/exports.md)) or to wait until year-end.
+     - **CFO**: a new plan for the budget is **Add New Plan** ([plans.md → Periods](../operating-jirav/references/plans.md#periods-and-manage-plans-columns)): set the actuals to end the month before the budget year and the forecast to the budget year, then Save. At the 5-active-plan limit, ask which plan to archive; if it's the Current PoR, say what reports will show instead ([plans.md → Plan of record](../operating-jirav/references/plans.md#plan-of-record-and-other-plan-facts)).
+   - Check `getAutoForecast(planId).plan.enabled`. A budget plan normally has Auto-Forecast off: while it's on, it hides typed values and drivers on accounts inside a group (the elimination driver and imported budget values included), adds to typed values on top-level accounts (drivers there may stop: check `misconfigured`), and zeroes System Salaries.
+2. **Departments.** `getSubscription().departments` says whether the company has departments. If it does, use `jirav.listDepartments()` and `getDepartmentMappings()`: the template has one row per account × master department, so departments must be set before the import.
+3. **The user's file.** Read it in the workspace (the `xlsx` skill, or Python), not in Jirav. Find its account labels, its department labels (a column, a sheet per department, or none) and its month columns. A file with no departments, in a company that has them: ask which department each section goes to; don't guess. Prior-year actuals are **not** needed: the file is the budget.
 4. **Balance Sheet baseline.** On the Assets, Liabilities and Equity pages (Department filter All), record every account's balance for the last actual month and the first forecast month. This is what Verify compares against.
    - **Check the plan isn't already wiped.** Balances normally carry forward, except where Jirav's own A/R and A/P forecast moves them (System lines). A non-cash account that drops to 0 in the first forecast month, with a typed **Decrease** (or **Increase**, for a negative balance) on its own line equal to its whole last actual balance, was wiped by an earlier import. Tell the user and offer the repair in section 2 **before** importing; otherwise the template comes back with an empty Balance Sheet sheet.
 5. **Staffing.** Check `jirav.listStaff(planId)` and the Salary Expenses account (Settings → Company → Plans; the name varies, e.g. Wages or Salaries and Wages). If staff exist, **System Salaries** already post to that account in every forecast month, by department. The wages rule below applies.
@@ -116,24 +119,22 @@ Fill all Income Statement cells in one `im.edit(t.i, 'Income Statement', {cell: 
 
 **Keep the inputs.** The in-page file is lost on any page load, and `im.readBase64` can't write into the cloud workspace by itself. Keep the edits object (or the user's source file) so the file can be rebuilt, and upload in the same page session as the build.
 
-**User's own budget file:** map their accounts and departments to the template's B and D values, and list anything that doesn't map. Never drop an unmapped line silently.
+**Morph the user's file into the template** (in the workspace, before touching Jirav):
+1. **Map accounts:** each line of the user's file → a template `B` (Account Name). Match exact names first, then obvious variants ("Salaries" → Wages). Every mapping that isn't exact goes in the proposal for the user to confirm.
+2. **Map departments:** each line → a template `D` (master department). Use the file's own department labels; if the file has none, the departments the user named in step 1.3.
+3. **Map months:** the file's month columns → the template's forecast-month columns. Months in the file outside the plan's forecast window can't be imported: list them. Annual-only figures: ask how to spread them (evenly, or by a pattern the user gives); never pick one silently.
+4. **Normalise signs** to the template's conventions (above), and roll several file lines that map to one account × department into one value (say which).
+5. **Unmapped lines:** list every line, with its annual total, that has no account or department in Jirav. Never drop one silently. The user decides: map it to an existing account, or add the account in Jirav first.
+6. **Tie out:** the mapped totals by section must equal the file's totals by section, less only the listed unmapped lines.
 
-**Made-up numbers (demo or training):** base them on the prior-year actuals. Defaults that worked:
-- Revenue lines grow monthly from a start point.
-- COGS is a % of revenue.
-- Wages are the prior-year Dec amount by department × 1.05. Where that is 0 (or far from) a department's System Salaries, use the System Salaries instead and say so: otherwise a department with staff budgets no wages.
-- Payroll taxes are 8% of department salaries, benefits $1,200 per roster head per month, and bonus 7.5% of salaries.
-- Rent, insurance and utilities are flat at the Dec run-rate × 1.03.
-- Variable OpEx starts at the Dec run-rate × 1.03 and grows 0.5% a month.
-- Depreciation is held flat.
-
-Say that the numbers are fictitious.
+Then build the edits object from the mapping. Large budgets can be sent in several `im.edit` calls, each on the previous call's file (`im.edit(f.i, …)`); keep the last one.
 
 ## 5. Propose once
 
 One message with:
 - the plan and its months
-- a table of totals by section (revenue, COGS, gross margin, OpEx including salaries, operating income) against the prior year
+- a table of totals by section (revenue, COGS, gross margin, OpEx including salaries, operating income) from the user's file, and the same totals as mapped into the template (they must tie)
+- the account and department mappings that weren't exact matches, and every unmapped line with its total
 - the wages approach (driver, plug, or roster-owned blank)
 - the Balance Sheet treatment: carried forward as prefilled, or the user's balances
 - that the import replaces direct line input in **this plan only**
@@ -158,7 +159,7 @@ If the wages driver applies (Option 1), add it now, one per department.
 
 On the plan with the Department filter set to **All**, read the forecast months with `readGridValues({from, to, kind: 'forecast'})` and check:
 
-- Revenue and COGS totals equal the file's totals.
+- Revenue, COGS, OpEx and other income/expense totals equal the user's file (less any unmapped lines the user agreed to leave out).
 - Gross margin = revenue − COGS.
 - OpEx = the imported OpEx lines + System Salaries + the elimination drivers (which should net the salaries to zero).
 - Wages = the intended source only: the imported value (with the driver), budget wages (with the plug), or System Salaries only (if roster-owned).
@@ -171,7 +172,7 @@ Afterwards, restore the Department filter to its original value.
 
 Report to the user:
 - the section totals table
-- the assumptions behind the numbers
+- the mappings used, and any lines or months that weren't imported
 - how payroll was handled, with the per-department driver amounts
 - the Balance Sheet check
 - the checks that passed
@@ -187,7 +188,7 @@ Report to the user:
 - **Blank Balance Sheet cells import as zero; blank Income Statement cells change nothing.** Treat the two sheets differently.
 - The template covers only the plan's **forecast** months. Wrong months mean the plan window needs fixing first.
 - The Department filter on plan pages persists across plans and sessions. Note it before changing it, and restore it after.
-- Budget each line in the department where its actuals sit, so budget vs actuals lines up.
+- Put each line in the department the user's file gives it. If that isn't where the company's actuals for that account usually sit (e.g. revenue budgeted under S&M but booked to Unassigned), flag it: budget vs actuals by department won't line up.
 - If the roster's department mix differs from the actual wage mix by department, flag it: a department-level budget vs actuals view will show the difference.
 - Auto-Forecast on in the budget plan hides or adds to the imported values and drivers, the elimination driver included ([plans.md → Auto-Forecast](../operating-jirav/references/plans.md#auto-forecast)). Keep it off unless the user wants it.
 - Driver menus open with a short animation. When scripting clicks, pause about 1 s between opening a menu and clicking an item.

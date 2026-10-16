@@ -3,7 +3,8 @@
 // references/reading-grid-values.md.
 //
 //   jirav.readGridValues(opts)  -> {context, columns, periods, kinds, grains, rowFields, rows, ...}
-//   jirav.readGridValues.cellPoint(label, "YYYY-MM", {department, index}) -> {x, y, value}   point to real-click a cell
+//   jirav.readGridValues.cellPoint(label, "YYYY-MM", {department, rowDepartment, parent, index}) -> {x, y, value}   point to real-click a cell
+//     department: a by-department COLUMN (report pages); rowDepartment / parent: pick among same-named ROWS (e.g. "Manual Input")
 //
 // Use it on: plan pages (accounts, staffing), custom table values in a plan, report pages, and the
 // plan's Assumptions panel (values in attrs; pass {grid: 1, skipEmpty: false}).
@@ -23,7 +24,11 @@ jirav.block('readGridValues', 'dev', (jirav) => {
 
     let comps = deepAll(document, '.ag-root-wrapper').map(el => el.__agComponent).filter(c => c && (c.gridApi || (c.gos && c.gos.api)));
     if (Number.isInteger(o.grid)) comps = comps.slice(o.grid, o.grid + 1);
-    if (!comps.length) throw new Error('No data grid on this page (dashboards/text pages have none). Wait with jirav.ready() or check the page.');
+    if (!comps.length) {
+      const panel = deepAll(document, '*').find(e => /no assumptions used in this table/i.test(e.textContent || '') && e.childElementCount < 3 && e.getBoundingClientRect().width > 0);
+      if (panel) throw new Error('The Assumptions panel is on "This Table", which is empty on this page: click its "All" tab, then read again.');
+      throw new Error('No data grid on this page (dashboards/text pages have none). Wait with jirav.ready() or check the page.');
+    }
 
     const grids = comps.map(c => {
       const api = c.gridApi || c.gos.api;
@@ -40,6 +45,8 @@ jirav.block('readGridValues', 'dev', (jirav) => {
         let start = pr.DATE_RANGE_START, end = pr.DATE_RANGE_END;
         const mid = id.match(/(\d{4})_MONTHLY_(\d+)/i);
         if (!start && mid) start = end = `${mid[1]}-${String(mid[2]).padStart(2, '0')}`;
+        const gid = id.match(/^cells\.([a-z]{3})-(\d{4})$/i);   // Settings → Goals: "cells.oct-2026"
+        if (!start && gid && MON[gid[1].toLowerCase()]) start = end = `${gid[2]}-${String(MON[gid[1].toLowerCase()]).padStart(2, '0')}`;
         if (!start) { const lb = String(header(col)).match(/^([A-Za-z]{3})-(\d{2})$/); if (lb && MON[lb[1].toLowerCase()] && (tags.includes('PERIODIC') || m.columnHeaderLevelType === 'PERIOD')) start = end = `20${lb[2]}-${String(MON[lb[1].toLowerCase()]).padStart(2, '0')}`; }
         if (!start) return null;                       // not a value column (label/attribute)
         const gd = groupDef(col), gm = (gd && gd.metadata) || {};
@@ -69,21 +76,26 @@ jirav.block('readGridValues', 'dev', (jirav) => {
       // account), total (top-level computed row, e.g. Gross Profit), line (other sub-lines such as
       // System Salaries / Manual Input). Report grids: header or line.
       const tagsOf = n => { const d = n.data || {}; const t = (d.rowMeta && d.rowMeta.metadata && d.rowMeta.metadata.tags) || (d.metadata && d.metadata.tags); return Array.isArray(t) ? t : []; };
-      // Locked plans carry no *_DRIVER_ALLOWED tags. Then infer structurally: accounts are
-      // non-driver rows at depth >= 1 whose Department is "All" (per-department rows are drivers
-      // or allocations); "System Salaries" / "Manual Input" are sub-lines. Marked kindsInferred.
+      // Some grids carry no *_DRIVER_ALLOWED tags (locked plans, and editable ones too, e.g. one
+      // company where this login sees none). Then infer structurally: accounts are non-driver rows at
+      // depth >= 1 whose Department matches the top-level rows' (the Department filter's value: "All",
+      // or e.g. "Unassigned"); per-department rows are drivers or allocations; "System Salaries" /
+      // "Manual Input" are sub-lines. Marked kindsInferred.
       const deptCol = cols.find(c2 => /^department$/i.test(String(header(c2))));
       let anyAllowed = false; api.forEachNode(n => { if (!anyAllowed && tagsOf(n).some(x => /_DRIVER_ALLOWED$/.test(x))) anyAllowed = true; });
       const isPlanGrid = (() => { let r = false; api.forEachNode(n => { if (!r && n.data && n.data.metadata && !n.data.rowMeta) r = true; }); return r; })();
       const inferred = isPlanGrid && !anyAllowed;
       const SUBLINES = /^(System Salaries|Manual Input)$/;
+      const onCustomTable = /\/custom\//.test(location.pathname);
+      let aggDept = 'All';
+      if (deptCol) { let found = false; api.forEachNode(n => { if (!found && n.level === 0) { const v = unwrap(api.getValue(deptCol, n)); if (v != null && v !== '') { aggDept = String(v); found = true; } } }); }
       const isAccountNode = n => {
         const tags = tagsOf(n);
         if (!inferred) return tags.some(x => /_DRIVER_ALLOWED$/.test(x));
         if (tags.includes('DRIVER') || n.level < 1) return false;
         const lbl = String(unwrap(api.getValue(labelCol, n)));
         const dep = deptCol ? String(unwrap(api.getValue(deptCol, n))) : 'All';
-        return dep === 'All' && !SUBLINES.test(lbl);
+        return dep === aggDept && !SUBLINES.test(lbl);
       };
       const rowKind = (n, tags) => {
         if (tags.includes('HEADER_ROW')) return 'header';
@@ -94,11 +106,14 @@ jirav.block('readGridValues', 'dev', (jirav) => {
           // A section's values total the rows under it: loaded children, or a folded section row
           // (e.g. "OpEx by Department" in a published pack, shown as one total).
           if ((n.childrenAfterGroup || []).length || (rm.collapsed && /^section=[A-Z_]+$/.test(rm.name || ''))) return 'section';
+          if (/PERCENT/i.test(((rm.settings || {}).type || {}).format || '')) return 'ratio';   // Gross Margin %: never sum
           return 'line';
         }
         if (tags.includes('DRIVER')) return 'driver';
         if (isAccountNode(n)) return (n.childrenAfterGroup || []).some(isAccountNode) ? 'group' : 'account';
         if (n.level === 0) return 'total';
+        // Custom tables: a nested section holds the total of the rows under it, like a group account.
+        if (onCustomTable && (n.childrenAfterGroup || []).some(ch => !tagsOf(ch).includes('DRIVER'))) return 'group';
         if (inferred) return 'line';
         return 'line';
       };
@@ -154,7 +169,7 @@ jirav.block('readGridValues', 'dev', (jirav) => {
         if (o.notes) { const nts = out.map(r => r.note || null); if (nts.some(Boolean)) g.notes = nts; }
       }
       if (!vcols.length && !(o.from || o.to || o.kind || o.grain) && !g.attrs.includes('Value')) g.warning = 'This grid has no period columns, so it is not a values grid (e.g. a setup list). Use the core list* lookups instead.';
-      if (inferred) g.kindsInferred = 'locked plan: account/group kinds inferred from structure (Department = All)';
+      if (inferred) g.kindsInferred = `no driver tags on this grid: account/group kinds inferred from structure (Department = ${aggDept})`;
       if (out.length < total) g.truncated = { kept: out.length, total };
       if (o.under && !underNode) g.note = `No row is labelled "${o.under}". Section and account labels are the company's own: read {maxDepth: 0} (or {maxDepth: 1}) to see them.`;
       else if (o.match && !out.length) g.note = `Nothing matched ${o.match}. Labels are the company's own: read {maxDepth: 1} to see them.`;
@@ -163,15 +178,15 @@ jirav.block('readGridValues', 'dev', (jirav) => {
     return grids.length === 1 ? grids[0] : grids;
   };
 
-  // read.cellPoint(label, 'YYYY-MM', {department, index, grid}) -> {x, y, value}: screenshot point of one cell,
+  // read.cellPoint(label, 'YYYY-MM', {department, rowDepartment, parent, index, grid}) -> {x, y, value}: screenshot point of one cell,
   // scrolled into view (parents expanded), for a real click before typing or Delete.
   read.cellPoint = async (label, period, opts = {}) => {
     const MON = { jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12 };
-    const comps = deepAll(document, '.ag-root-wrapper').map(el => el.__agComponent).filter(c => c && (c.gridApi || (c.gos && c.gos.api)));
-    const c = comps[opts.grid || 0];
+    const roots = deepAll(document, '.ag-root-wrapper').filter(el => el.__agComponent && (el.__agComponent.gridApi || (el.__agComponent.gos && el.__agComponent.gos.api)));
+    const root = roots[opts.grid || 0], c = root && root.__agComponent;
     if (!c) throw new Error('No data grid on this page.');
     const api = c.gridApi || c.gos.api, capi = c.columnApi || (c.gos && c.gos.columnApi) || api;
-    const cols = capi.getAllDisplayedColumns(), labelCol = cols[0];
+    const cols = capi.getAllDisplayedColumns().filter(cl => cl.getColId() !== 'rowMenu'), labelCol = cols[0];
     const unwrap = v => (v && typeof v === 'object' && 'value' in v) ? v.value : v;
     const monthOf = col => {
       const pr = (col.getColDef().metadata || {}).properties || {}, id = col.getColId();
@@ -182,17 +197,61 @@ jirav.block('readGridValues', 'dev', (jirav) => {
     };
     const col = cols.find(cl => monthOf(cl) === period && (!opts.department || ((cl.getColDef().metadata || {}).properties || {}).DEP_NAME === opts.department));
     if (!col) throw new Error(`No ${period} month column${opts.department ? ' for ' + opts.department : ''} on this page.`);
-    const hits = []; api.forEachNode(n => { if (unwrap(api.getValue(labelCol, n)) === label) hits.push(n); });
+    let hits = []; api.forEachNode(n => { if (unwrap(api.getValue(labelCol, n)) === label) hits.push(n); });
     if (!hits.length) throw new Error(`No row labelled "${label}".`);
-    if (hits.length > 1 && opts.index == null) throw new Error(`${hits.length} rows are labelled "${label}": pass {index} (0 = first, in grid order).`);
+    // Same-named rows (each department's "Manual Input"): narrow by the row's Department cell or its parent row.
+    const depCol = cols.find(cl => /^department$/i.test(String(capi.getDisplayNameForColumn(cl, 'header'))));
+    if (opts.rowDepartment) {
+      if (!depCol) throw new Error('This grid has no Department column: {rowDepartment} needs one.');
+      hits = hits.filter(n => String(unwrap(api.getValue(depCol, n))) === opts.rowDepartment);
+    }
+    if (opts.parent) hits = hits.filter(n => { for (let q = n.parent; q && q.level >= 0; q = q.parent) if (unwrap(api.getValue(labelCol, q)) === opts.parent) return true; return false; });
+    if (!hits.length) throw new Error(`No row labelled "${label}"${opts.rowDepartment ? ' for department ' + opts.rowDepartment : ''}${opts.parent ? ' under ' + opts.parent : ''}.`);
+    if (hits.length > 1 && opts.index == null) throw new Error(`${hits.length} rows are labelled "${label}": pass {rowDepartment}, {parent} or {index} (0 = first, in grid order).`);
     const n = hits[opts.index || 0];
     for (let p = n.parent; p && p.level >= 0; p = p.parent) if (p.setExpanded && !p.expanded) p.setExpanded(true);
     await new Promise(r => setTimeout(r, 300));
+    // Narrow panes (Cowork ~800 px): if the scrolling area can't show the month column, make room,
+    // view-only (nothing saved; a reload restores it): collapse Jirav's left sidebar, then narrow the
+    // pinned columns. Never ask the user to resize.
+    const room = () => { const v = root.querySelector('.ag-center-cols-viewport'), w = root.getBoundingClientRect(); if (!v) return 0;
+      const r = v.getBoundingClientRect(); return Math.max(0, Math.min(r.right, w.right, innerWidth) - Math.max(r.left, w.left, 0)); };
+    const need = Math.min(col.getActualWidth(), 120) + 8;
+    if (room() < need && jirav.collapseSidebar && await jirav.collapseSidebar()) await new Promise(r => setTimeout(r, 400));
+    if (room() < need) {
+      // Jirav saves column widths in this browser (localStorage "...COLUMN_SIZES..."): put them back after
+      // narrowing, so the change lasts only for this view and the user's own layout is untouched.
+      const sizeKeys = () => { try { return Object.keys(localStorage).filter(k => /COLUMN_SIZES/i.test(k)); } catch (e) { return []; } };
+      const before = new Map(sizeKeys().map(k => [k, localStorage.getItem(k)]));
+      const restore = () => { try { for (const k of sizeKeys()) before.has(k) ? localStorage.setItem(k, before.get(k)) : localStorage.removeItem(k); } catch (e) {} };
+      setTimeout(restore, 2500);
+      const setW = (cl, w) => capi.setColumnWidth ? capi.setColumnWidth(cl, w) : api.setColumnWidths([{ key: cl.getColId(), newWidth: w }]);
+      let short = need - room();
+      const pinned = cols.filter(cl => cl.getPinned && cl.getPinned());
+      for (const pc of [...pinned.filter(cl => cl !== labelCol), ...pinned.filter(cl => cl === labelCol)]) {   // labels last: keep names readable
+        const floor = Math.max(pc === labelCol ? 140 : 60, pc.getColDef().minWidth || 0), cut = Math.min(short, pc.getActualWidth() - floor);   // the grid ignores widths below minWidth
+        if (cut > 0) { setW(pc, pc.getActualWidth() - cut); short -= cut; }
+        if (short <= 0) break;
+      }
+      await new Promise(r => setTimeout(r, 400)); restore();
+    }
     api.ensureNodeVisible(n, 'middle'); (api.ensureColumnVisible || capi.ensureColumnVisible).call(api.ensureColumnVisible ? api : capi, col);
     await new Promise(r => setTimeout(r, 500));
     const el = deepAll(document, `.ag-row[row-index="${n.rowIndex}"] .ag-cell[col-id="${col.getColId()}"]`).find(e => e.getBoundingClientRect().width > 0);
     if (!el) throw new Error('The cell did not render: scroll the grid into view and call again.');
-    return { ...jirav.at(el), value: unwrap(api.getValue(col, n)) };
+    // Click the middle of the part of the cell that's really showing: inside the scrolling area (pinned
+    // columns can cover it in a narrow pane) and inside the window. Too little showing -> offscreen.
+    const r = el.getBoundingClientRect(), vp = el.closest('.ag-center-cols-viewport, .ag-center-cols-clipper, .ag-pinned-left-cols-container, .ag-pinned-right-cols-container') || el;
+    const v = vp.getBoundingClientRect();
+    const x0 = Math.max(r.left, v.left, 0), x1 = Math.min(r.right, v.right, innerWidth), y0 = Math.max(r.top, 0), y1 = Math.min(r.bottom, innerHeight);
+    const value = unwrap(api.getValue(col, n));
+    if (x1 - x0 < 12 || y1 - y0 < 8) return { offscreen: true, value, reason: `only ${Math.max(0, Math.round(x1 - x0))} px of the cell can show, even with the sidebar collapsed and the pinned columns narrowed: close any open panel and call again` };
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+    let hit = document.elementFromPoint(cx, cy);                    // the grid can sit in shadow DOM: drill down
+    while (hit && hit.shadowRoot) { const d = hit.shadowRoot.elementFromPoint(cx, cy); if (!d || d === hit) break; hit = d; }
+    if (!hit || !(hit === el || el.contains(hit))) return { offscreen: true, value, reason: 'something covers the cell (a panel or the save bar): close it and call again' };
+    const k = jirav.frame.width / innerWidth;
+    return { x: Math.round(cx * k), y: Math.round(cy * k), value };
   };
 
   return read;

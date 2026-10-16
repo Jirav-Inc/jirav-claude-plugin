@@ -28,7 +28,7 @@ message. Don't ask what Jirav can tell you.
   - the **outlook**: this fiscal year's actuals to date plus the remaining forecast;
   - **next year**, only if a plan covers it (check its months), or if the user asks.
 - **Plans.** Budget, forecast and next year's plan, picked as in
-  [plan-roles.md](../finance-references/plan-roles.md). Say
+  [plan-roles.md](../operating-jirav/references/finance/plan-roles.md). Say
   which you picked and why: plan names are often misleading.
 - **Existing material.** If the company has a board package in Jirav ([reports.md](../operating-jirav/references/reports.md)),
   or the user has a previous deck, follow its structure and metric definitions.
@@ -53,6 +53,8 @@ plan"), not a label ("Q3 P&L"). Charts for trends, tables only where exact numbe
 5. **KPIs.** The company's own KPIs as trends.
 6. **Headcount.** By department vs plan; open and planned hires.
 7. **Cash and runway.** Cash balance, burn, projected cash through the forecast, runway if burning.
+   Which burn, where the numbers come from and the runway edge cases:
+   [burn-and-runway.md](../operating-jirav/references/finance/burn-and-runway.md).
 8. **Next year's plan** (if in scope). Revenue, gross margin, OpEx, operating income, headcount;
    growth vs this year's outlook; a bridge; the **key assumptions**, read from the plan's assumption
    values and drivers.
@@ -68,7 +70,7 @@ plan"), not a label ("Q3 P&L"). Charts for trends, tables only where exact numbe
   rather than deriving them.
 - Totalling months into quarters or years is fine: say you did. Never compute values from raw API
   payloads.
-- Compare as in [variance-analysis.md](../finance-references/variance-analysis.md): direction, which
+- Compare as in [variance-analysis.md](../operating-jirav/references/finance/variance-analysis.md): direction, which
   variances to report, explaining them, and its flags (used in steps 4 and 6).
 
 ## 4. Write the story

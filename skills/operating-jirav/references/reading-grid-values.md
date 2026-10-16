@@ -75,10 +75,14 @@ blank and the row would vanish). With several grids on one page the result is an
     - `driver`: a driver line under an account (its values are part of the account's).
     - `total`: a top-level computed row, e.g. Gross Profit or Operating Income.
     - `line`: other sub-lines, e.g. System Salaries or Manual Input.
+  - Custom-table pages: top-level sections are `total`; a **nested section is `group`** (it holds the
+    total of the rows under it, e.g. Product Revenue = Widget + Gizmo Revenue): don't add it to its
+    `account` rows.
   - Report pages:
     - `section`: a row whose values total the rows under it ("Revenue", "OpEx by Department"),
       even when a published pack shows it folded as one row.
     - `subtotal`: "Subtotal …" / "Total …" rows. A section and its subtotal carry the **same** total.
+    - `ratio`: percent rows (Gross Margin %, Net Income %): never add them up; recompute from their parts.
     - `line`: everything else: accounts, KPIs, Gross Margin, Net Income.
     - `header`: a label row with no values (only when headers are included).
     - **Never sum a depth on a report page.** One Executive Summary had Revenue (section) +
@@ -87,9 +91,11 @@ blank and the row would vanish). With several grids on one page the result is an
       `'Net Income'`), or sum `rowKind: 'line'` under one section.
   - For "top expenses" questions use `rowKind: 'account'` (or `'group'` for categories). Empty rows
     are skipped by default, so fewer than N rows means only that many have values: say so.
-  - **Locked plans** carry no account tags. `jirav.readGridValues` then infers kinds from structure and adds
-    `kindsInferred` to the output. The results matched the tagged kinds in testing, but say so if
-    precision matters.
+  - **Some grids carry no account tags**: locked plans, and some editable ones (seen in one company).
+    `jirav.readGridValues` then infers kinds from structure, using the Department filter's value
+    (All, or e.g. Unassigned), and adds `kindsInferred` to the output. It doesn't mean the plan is
+    locked: check `listPlans().editable`. The results matched the tagged kinds in testing, but say
+    so if precision matters.
   - **Plan pages repeat earlier sections.** Each income statement page carries the lines above
     it: the Cost of Sales page also lists the Revenue accounts, OpEx shows Gross Profit, and Other
     shows Operating Income. When gathering accounts across pages, read each page's own section
@@ -107,7 +113,10 @@ blank and the row would vanish). With several grids on one page the result is an
     can exceed ±1). Custom-table grids take percents typed as whole numbers (9 = 9%): multiply by 100 before
     typing a value back.
   - `NUMBER`: a plain number.
-- **`attrs`**: row attributes, e.g. `{ Department: 'All' }` on plan pages.
+- **`attrs`**: row attributes, e.g. `{ Department: 'All' }` on plan pages. With sub-departments, a
+  parent's own rows are labelled **"<Dept> (Only)"** (e.g. "S&M (Only)"): that department's own amounts,
+  not its children's. The Department filter shows the tree (▸ expands a parent); `listDepartments()`
+  gives each department's `parent`.
 - **`truncated`**: filters removed rows. It doesn't mean data is missing.
 
 ## Size

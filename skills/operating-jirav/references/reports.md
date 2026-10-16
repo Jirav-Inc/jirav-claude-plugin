@@ -19,8 +19,8 @@ LIVE package changes it for everyone who opens it. Reports only *display* data f
 
 ```js
 await jirav.listReports()               // [{id, name, status, lastUpdateTime}] newest first
-await jirav.listReportPages(reportId)   // [{name, type, hasGrid}]
-await jirav.getReportSetup(reportId)    // per page: [{page, type, template, departments, groups: [{source, range, rangeDates, warning?, show, compareTo, thirdSource, variance}]}]
+await jirav.listReportPages(reportId)   // [{name, type, hasGrid, slug, dashboardId?}]  slug = the page's URL segment; dashboard pages: the dashboard's id for listDashboardTiles
+await jirav.getReportSetup(reportId)    // reportId optional on an open report; per page: [{page, type, template, departments, groups: [{source, range, rangeDates, warning?, show, compareTo, thirdSource, variance}]}]
 await jirav.listReportSources()         // [{id, name, type, planId?, pointsTo?, dates}]
 ```
 
@@ -48,6 +48,9 @@ await jirav.listReportSources()         // [{id, name, type, planId?, pointsTo?,
   which you used. Publish names default to `<package> <Mon YY>` of
   the day it was published, so "Mar 26" often has February as its last actual month. Check
   `jirav.getPeriods().closeMonth` and the last `actual` column.
+- **A published package's months are frozen** at publish time ("This Year" on a pack published in
+  2025 still shows 2025). `getReportSetup` marks it `published: true` and leaves `rangeDates` empty
+  (today's dates don't apply): read the months from the page (`readGridValues` → `periods`).
 - Pages whose columns don't fit the question (e.g. months only, or quarter-to-date only): a published
   pack can't be changed. Total the exported months yourself (say so), or offer the LIVE package or a
   plan page.

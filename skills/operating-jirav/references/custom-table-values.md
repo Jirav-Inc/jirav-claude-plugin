@@ -7,16 +7,23 @@ by [plan drivers](plan-drivers.md) or [global drivers](global-drivers.md); those
 read-only. Find tables with `await jirav.listCustomTables()` → `[{id: "custom-xxxxxx", name}]`.
 
 1. Open the table in the plan.
-2. Check editability: `jirav.readGridValues({ editable: true })`. Actual months are read-only;
-   forecast months are editable.
-3. **Double-click** a cell (or click + Enter) → type → **Enter**. Repeat as needed. Point:
-   `jirav.readGridValues.cellPoint('<line>', 'YYYY-MM')`. To **clear** a value: click it, press **Delete**.
+2. Check editability: `jirav.readGridValues({ editable: true })`. Actual months are read-only, and
+   typing there **fails silently** (no editor opens, nothing changes, no message): check first.
+3. Click a cell + **Enter** (or double-click) → type → **Enter**. **Tab** also commits and opens the
+   next month, so a row can be typed in one pass. Point:
+   `jirav.readGridValues.cellPoint('<line>', 'YYYY-MM')`. To **clear** a value: click it, press
+   **Delete**; it reads 0 until SAVE, then blank. Don't report that 0 as a typed value.
 4. **SAVE** in the bottom bar (CANCEL discards all pending edits). Line totals and drivers update
-   only after SAVE. Reload and re-read to verify.
+   only after SAVE. A reload or navigation before SAVE **drops the edits** (a person may get a
+   "Leave site?" prompt; automation doesn't): before leaving, check `jirav.saveBar().pending` is
+   false. Reload and re-read to verify.
+
+Auto-Forecast doesn't change custom-table values (verified).
 
 ## What you type
 
-- **Percent lines:** type whole percentages: `15` or `15%` is 15%, `0.15` is 0.15%.
+- **Percent lines:** type whole percentages: `15` or `15%` is 15%, `0.15` is 0.15%. An import file
+  is the opposite: it takes fractions ([imports.md](imports.md)).
   `readGridValues` returns percents as fractions (0.15 = 15%): multiply by 100 before typing a
   value you read.
 - **Driven lines:** the line's own row is read-only; under it is an input row with the **same
@@ -33,6 +40,12 @@ The plan grid has monthly columns only. Roll months up by the line's **Period Va
 ([custom-table-structure.md](custom-table-structure.md)): Sum → add the months, Ending Balance →
 last month, Beginning Balance → first month, Average → average, Formula Based → read it from a
 report. Say you rolled it up.
+
+- **Ratio and percent lines** (conversion %, margin %): Average takes the mean of the monthly %, which
+  isn't the period's ratio. For "Q1 conversion" recompute from the component lines (Σ Leads ÷ Σ
+  Traffic) and say so, or read a Formula Based line from a report.
+- **Which quarter or year:** fiscal (`getPeriods().fiscalYearStartMonth`) unless the user says calendar;
+  say which you used.
 
 For bulk values users often import from Google Sheets or Excel (lines with Allow Import = YES). To import, see [imports.md](imports.md).
 

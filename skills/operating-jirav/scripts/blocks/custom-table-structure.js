@@ -7,11 +7,12 @@
 //   ct.open(name)              -> {ok, active, id} | {ok:false, active, why}   opens the editor on that table and checks it
 //   ct.active()                -> name of the table open in the editor
 //   ct.openTableMenu(name)     -> [{label, x, y}]   opens a table's ⋮ (shadow DOM) and lists its items
-//   ct.rows()                  -> [{name, type, depth, section, moving, menu:{x,y}}]   rows in screen order
+//   ct.rows()                  -> [{name, type, depth, section, moving, menu:{x,y}}]   rows in screen order; type line|section|reference|subtotal|blank; a reference is named by what it points at
 //   ct.row(name)               -> one row (throws if missing or ambiguous)
 //   ct.moving()                -> name of the row in Move mode, or null
 //   ct.pending()               -> {pending, blocked, reason?, save:{x,y}, cancel:{x,y}}   the SAVE CHANGES bar; blocked = SAVE disabled
 //   ct.structure()             -> the saved structure of the open table (API), as a nested list
+//   ct.check()                 -> [{section, problem, lines}] Format / Period Value mismatches under a section ([] = none)
 //   ct.move(name, target, {where:'before'|'after'})   drag a row that is in Move mode (the one gesture)
 if (typeof jirav === 'undefined') throw new Error('Paste scripts/jirav.min.js (the core) first.');
 jirav.block('customTableStructure', 'dev', (jirav) => {
@@ -55,26 +56,31 @@ jirav.block('customTableStructure', 'dev', (jirav) => {
       .map(b => ({ label: b.textContent.trim(), ...jirav.at(b) }));
   };
 
-  const describe = item => {
-    const own = sel => [...item.querySelectorAll(sel)].find(e => e.closest('.muuri-item') === item);
-    const el = own('.movable-group-element');
+  // One row per editor element, in screen order. A section's own item holds its header and, when it has
+  // one, its Subtotal row (after the section's lines), so rows are read per element, not per item.
+  const describe = el => {
+    const item = el.closest('.muuri-item');
     const txt = el.innerText || '';
     const typeTxt = (txt.match(/ROW TYPE\s*\n\s*([^\n]+)/i) || [])[1] || (/Blank Row/i.test(txt) ? 'Blank Row' : '');
     const type = { 'New Line': 'line', 'Section': 'section', 'Reference': 'reference', 'Subtotal': 'subtotal', 'Blank Row': 'blank' }[typeTxt.trim()] || typeTxt.trim().toLowerCase();
     const input = el.querySelector('input.movable-input');
-    const name = input ? input.value : type === 'reference' ? ((txt.match(/REFERENCE\s*\n\s*([^\n]+)/i) || [])[1] || 'Reference').trim() : type === 'blank' ? 'Blank Row' : '';
+    const headName = it => { const h = [...it.querySelectorAll('input.movable-input')].find(i => i.closest('.muuri-item') === it); return h ? h.value : null; };
+    // A Reference row's name is what it points at, under the upper-case REFERENCE label ("OpEx $ ⋄ Sales & Marketing ⋄ Advertising").
+    const name = type === 'reference' ? ((txt.match(/\nREFERENCE\s*\n\s*([^\n]+)/) || [])[1] || 'Reference').trim()
+      : type === 'subtotal' ? `Subtotal ${headName(item) || ''}`.trim() : input ? input.value : type === 'blank' ? 'Blank Row' : '';
     let depth = 0, section = null, p = item.parentElement && item.parentElement.closest('.muuri-item');
+    if (type === 'subtotal') { section = headName(item); depth = 1; }
     while (p) {
       depth++;
-      if (section === null) { const pi = p, h = [...pi.querySelectorAll('input.movable-input')].find(i => i.closest('.muuri-item') === pi); section = h ? h.value : null; }
+      if (section === null) section = headName(p);
       p = p.parentElement && p.parentElement.closest('.muuri-item');
     }
     const btn = el.querySelector('.jv-action-menu-container button');
     // The "…" glyph sits left of and below the button's centre; clicks at the centre often miss.
     const glyph = btn && (() => { const c = jirav.at(btn); return { x: c.x - 3, y: c.y + 2 }; })();
-    return { name, type, depth, section, moving: !!own('.movable-group-element.draggable'), menu: glyph || null, _item: item };
+    return { name, type, depth, section, moving: el.classList.contains('draggable'), menu: glyph || null, _item: item };
   };
-  const allRows = () => { onPage(); return [...document.querySelectorAll('.muuri-item')].filter(i => i.closest('.movable-group-element-container')).map(describe); };
+  const allRows = () => { onPage(); return [...document.querySelectorAll('.movable-group-element')].filter(e => e.closest('.muuri-item') && e.closest('.movable-group-element-container')).map(describe); };
   const strip = r => { const { _item, ...rest } = r; return rest; };
   const rows = () => allRows().map(strip);
   const find = name => {
@@ -90,7 +96,7 @@ jirav.block('customTableStructure', 'dev', (jirav) => {
     const btn = t => [...document.querySelectorAll('button, a')].find(b => b.textContent.trim().toUpperCase() === t && shown(b));
     const s = btn('SAVE CHANGES'), c = btn('CANCEL');
     // pending: the bar is up; blocked: SAVE CHANGES is disabled (reason = its tooltip), don't click it.
-    const blocked = !!s && !!(s.disabled || s.closest('[disabled]')), tip = s && s.closest('[data-tooltip]');
+    const blocked = !!s && !!(s.disabled || s.getAttribute('aria-disabled') === 'true' || s.closest('[disabled], [aria-disabled="true"]')), tip = s && s.closest('[data-tooltip]');
     return { pending: !!s, blocked, ...(blocked ? { reason: (tip && tip.getAttribute('data-tooltip')) || null } : {}),
       save: s ? jirav.at(s) : null, cancel: c ? jirav.at(c) : null };
   };
@@ -108,11 +114,32 @@ jirav.block('customTableStructure', 'dev', (jirav) => {
       if (k === 'section') { s.subtotal = v.subtotal; s.children = v.children.map(walk); } return s; };
     return { id: t.id, name, elements: (r.customTableConfig || r).elements.map(walk) };
   };
+  // Section rules (references/custom-table-structure.md): everything a section with a Subtotal totals should share one Format
+  // and one Period Value. A saved mismatch turns the section red in plans (Period Value, or a reference) or
+  // silently mixes $ and # (a nested section). Returns the problems in the saved structure; [] = none.
+  const check = async () => {
+    const st = await structure(), out = [];
+    const lines = el => el.type === 'manualLine' ? [el] : el.type === 'section' ? el.children.flatMap(lines) : [];
+    const visit = (el, path) => {
+      if (el.type !== 'section') return;
+      const p = path.concat(el.label), ls = lines(el);
+      if (!el.subtotal) { el.children.forEach(c => visit(c, p)); return; }   // no Subtotal: a grouping, nothing is totalled
+      const fmts = [...new Set(ls.map(l => l.format).filter(Boolean))], pvs = [...new Set(ls.map(l => l.periodValue).filter(Boolean))];
+      if (fmts.length > 1) out.push({ section: p.join(' › '), problem: `mixed Format: ${fmts.join(', ')}`, lines: ls.map(l => `${l.label} (${l.format})`) });
+      if (pvs.length > 1) out.push({ section: p.join(' › '), problem: `mixed Period Value: ${pvs.join(', ')}`, lines: ls.map(l => `${l.label} (${l.periodValue})`) });
+      if (el.children.some(c => c.type === 'lineReference') && ls.length)
+        out.push({ section: p.join(' › '), problem: 'has a Reference row next to lines: check its format and Period Value match, and that the section row isn\'t red in a plan' });
+      el.children.forEach(c => visit(c, p));
+    };
+    st.elements.forEach(e => visit(e, []));
+    return out;
+  };
   const move = async (name, target, opts) => {
     const r = find(name), t = find(target);
+    if (r.type === 'subtotal' || t.type === 'subtotal') return { ok: false, why: 'A Subtotal row moves with its section: move the section, or target a line.' };
     if (!r.moving) return { ok: false, why: `"${name}" is not in Move mode: click its ⋯ (ct.row(name).menu) and choose Move first.` };
     const res = await jirav.drag(r._item, t._item, opts);
     return Object.assign(res, { order: rows().map(x => (x.depth ? '  '.repeat(x.depth) : '') + x.name) });
   };
-  return { tables, active, open, openTableMenu, rows, row, moving, pending, structure, move };
+  return { tables, active, open, openTableMenu, rows, row, moving, pending, structure, check, move };
 }, 'Settings → Custom Tables editor: rows, menus, Save bar, structure, drag a row in Move mode');

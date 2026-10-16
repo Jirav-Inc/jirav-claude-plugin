@@ -15,4 +15,35 @@ in plans where it's on.
 Read the Auto-Forecast settings: `(await jirav.getAutoForecast()).company` →
 `{mode: AUTOMATIC|CUSTOM, method, departments: {mode, selected}, accountSettings}`.
 
-Not yet explored: the Custom option's per-account controls, and editing the A/R and A/P settings.
+**Custom** (seen, not saved): **Default Settings for All Accounts** (Departments: All or
+some; Method: Linear Trend with Seasonality, Linear Trend, Simple Average (Flatline)), then
+**Individual Account Settings** (expand ⌄): tabs Revenue · COGS · OpEx · Other Income · Other
+Expense, one row per top-level account with an **Enable** switch, Departments and Method. Switching
+Forecast Type and leaving with CANCEL asks "Discard Changes" → DISCARD, which restores the saved mode.
+`getAutoForecast().company.accountSettings` is keyed by account id and lists the accounts that are
+**on**: an account switched off is missing from it.
+
+**Switching an account off keeps its drivers working** (verified on a plan copy): with Custom saved
+and the account's Enable off, that account got no Auto-Forecast row and its driver counted
+(`misconfigured: false`), while the other accounts were still auto-forecast. This is the way to
+auto-forecast most of a plan but drive a few accounts yourself. It's company-wide: it applies in
+every plan with Auto-Forecast on.
+
+Read `accountSettings` for per-account overrides. Method names are all the settings say: Jirav
+doesn't show the per-account math.
+
+Which plans have it on: `listPlans()` → `autoForecast`.
+
+**A/R and A/P** (`/setup/forecast/arap`; read with `await jirav.getArApSettings()` →
+`{ar: {method, delay, account}, ap: {method, delay, account, accrualAccounts}}`, method `none`,
+`trended` or `delayed`): A/R method **None / Trended percent of Revenue / Delayed
+days for collection**, the A/R account and A/R Delay (e.g. NET 30); A/P method **None / Trended
+percent of OpEx / Delayed days for Payment**, the A/P account, A/P Delay and A/P Accrual Accounts
+(chips).
+
+**None** = no A/R forecast: the receivable stays at its last actual balance and forecast revenue
+isn't collected into cash (verified on a plan copy: switching Delayed NET 0 → None left A/R flat
+and lowered cash by that amount). Switching None → Delayed asks for the account again (it's
+cleared). Settings → Forecast saves with SAVE in the bottom bar.
+
+Not yet tested: Trended (A/R / A/P).

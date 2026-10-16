@@ -1,7 +1,7 @@
 # Variable picker ("Select Driver Input")
 
 **Scope: a shared control, not a place.** It opens wherever Jirav asks for a series or a driver
-input: plan drivers ([plan-drivers.md](plan-drivers.md)), global drivers (no Assumptions category),
+input: plan drivers ([plan-drivers.md](plan-drivers.md)), global drivers (Assumptions only when the company has assumption tables),
 Balance Sheet, CapEx and Allocation drivers ([drivers-overview.md](drivers-overview.md)), staffing
 drivers ([staffing.md](staffing.md)), Variance Rules, Goals and report lines.
 

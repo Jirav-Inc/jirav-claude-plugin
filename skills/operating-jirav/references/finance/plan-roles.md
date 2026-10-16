@@ -2,7 +2,7 @@
 
 Jirav has no "budget" or "forecast" object: both are ordinary plans, and the app doesn't record
 which is which. Work it out from the app facts in `operating-jirav` →
-[plans.md](../operating-jirav/references/plans.md) (cutover, periods, plan of record, Auto-Forecast
+[plans.md](../plans.md) (cutover, periods, plan of record, Auto-Forecast
 plan), then **say which plans you picked and why**, and ask when it isn't clear.
 
 ## Budget

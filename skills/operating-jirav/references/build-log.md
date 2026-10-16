@@ -11,7 +11,9 @@ After **Edits step 5 (Verify)**, for every change attempt that reached the app:
 
 - one row per object × period range (a driver, a line's values for a range of months, a report
   page's columns, a tile, an import), **not** per cell;
-- `verified` = `pass` if the re-read matches, `fail` if it doesn't, `partial` if some of it saved;
+- `verified` = `pass` if the re-read matches, `fail` if it doesn't, `partial` if some of it saved
+  or it saved but what should follow from it didn't (a hire saved, OpEx unchanged because Salary
+  Expenses isn't set);
 - failed and partial attempts get a row too: those are the ones worth finding later.
 
 Read-only work writes nothing. A level-2 skill passes its own name in `skill` and a short reason
@@ -31,8 +33,9 @@ the user answers both at once:
 - Never pick a folder yourself. If a connected folder already has a `jirav/` log folder, you may
   offer it: "Keep using the log in `<folder>/jirav`?"
 - The folder must be connected to this session. If the one they name isn't, request access to it.
-- If they decline, or no folder can be reached, put the rows in the chat for this session (a short
-  table in the final message) and don't ask again.
+- If they decline, or no folder can be reached, write the same CSV (same name and format) in this
+  session's outputs, give it to the user as a file at the end, and add a short table of the rows
+  in the final message. Don't ask again.
 - On the first write, say the file's full path and that it contains their financial values.
 
 The date in the file name is the **user's local date**.

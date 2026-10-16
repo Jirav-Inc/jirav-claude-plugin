@@ -12,8 +12,24 @@ await jirav.getDataStatus()
 ```
 
 Use it before trusting actuals (month-end, variance work): say which system feeds them, when they
-last arrived, and the close month. Flag `connected: false` (the accounting link needs
-re-authorising) and imports that are months old. The page's **Status** box shows the same.
+last arrived, and the close month. The page's **Status** box shows the same.
+
+- **`source: null`** means no accounting system is selected (4 of 16 companies checked).
+- **`JiravExcel`** is the Excel actuals source: the **Manual import** card under Integrations →
+  Actuals → Accounting (Excel, Template, IMPORT). It's switched on per company (offered in 5 of 16
+  checked; rarely selected), so the card isn't always there. A file source has no live link:
+  `connected` is always `false`, so judge it by the last import (Chart of Accounts / Trial Balance
+  "Last Import") and `actualsThrough`. While it's the source every connector card is greyed out.
+  Importing: [excel-actuals.md](excel-actuals.md).
+- **`connected: false`** on a connector often just means an unused connection (one company's last
+  trial balance was 2022). Flag it as needing attention only when the company expects syncs (recent
+  imports, or QuickBooks Import set to Automatic); otherwise say "not connected; last import <date>".
+- The `last…` fields are **import dates, not data freshness**: an import that changed nothing still
+  moves them.
+- **Which months hold actuals:** `actualsFrom` / `actualsThrough` (first and last month with any
+  Revenue, COGS or OpEx actual). Say "actuals through <actualsThrough>; closed through <closeMonth>":
+  the close month can lag the data (closed Apr-26, actuals through Oct-26) or run ahead of it
+  (closed May-24, actuals through Oct-21). `null` means no Income Statement actuals at all.
 
 ## What's on the page
 

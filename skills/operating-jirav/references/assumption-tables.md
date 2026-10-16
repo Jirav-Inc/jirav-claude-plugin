@@ -19,9 +19,16 @@ await jirav.listAssumptions()
 Settings → Assumptions: `/<tenant>/setup/assumptions/`. Keep the trailing slash; without it you
 land on the dashboard.
 
-- **Tables:** **Manage Tables** → Add Assumption Table → name it → **DONE** (saves). Rows have a
-  drag handle. A table's ⋮ has only **Delete**, which confirms ("…Plans referencing this
-  assumption table will be affected") and is immediate.
+- **Tables:** **Manage Tables** → **Add Assumption Table** creates "New Assumption Table" **at once**,
+  and a rename is saved as soon as you leave the field: **DONE** only closes the dialog. So type the
+  real name first time. Rows have a drag handle. A table's ⋮ has only **Delete**, which confirms
+  ("…Plans referencing this assumption table will be affected") and is immediate.
 - **Assumptions:** expand a table → **Add Assumption** → Name and Type (Percent % / Number # /
-  Money $) → **SAVE** in the bottom bar. A row's ⋮ has Clone and Delete.
+  Money $) → **SAVE** in the bottom bar. A row's ⋮ has Clone and Delete. Names must be unique
+  **within a table**.
+- **Typing a name:** select-all doesn't work in these fields (triple-click, Cmd+A and Ctrl+A all
+  append). Click the field → End → Backspace once per character → type → Tab.
+- **Check every save with `listAssumptions()`.** A failed SAVE shows no message: with a duplicate
+  name the field says "Assumption table names must be unique" in red, SAVE gets a 400 error, and
+  the bar stays. Special characters (`& / %`) in names are fine.
 

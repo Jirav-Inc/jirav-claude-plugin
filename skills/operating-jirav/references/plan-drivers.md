@@ -17,7 +17,7 @@ For every change, follow **Edits** in SKILL.md. Offer to try it on a copy of the
 
 ```js
 await jirav.listPlanDrivers(planId)            // another company: listPlanDrivers(planId, 'company name')
-// [{id, name, type, page, account, department, inputs, misconfigured}]  this plan's drivers (no global ones)
+// [{id, name, type, page, account, department, frequency, start, end, output?, inputs, misconfigured}]  output: Balance Sheet drivers' {account, change}  this plan's drivers (no global ones); frequency = every N months from start
 ```
 
 `account` and `department` are names. `type` is the internal kind (Fixed Spread = `annual_spread`,
@@ -48,7 +48,8 @@ driver isn't producing values; that's often Auto-Forecast (below), so flag it to
      Date, Min Date, Cutover Date (default), Max Date) · End Date Type (default Max Date) ·
      Description.
    - **Explicit Spend** (Annual Target, Fixed Spread): overrides chosen months with a fixed amount.
-     *(help)* It can be linked to a custom-table line, so someone else maintains those months.
+     It can be linked to a custom-table line, so someone else maintains those months (not the
+     driver's own output line).
 5. **Save** → toast "New driver(s) created for <Account> (<departments>)". A child row per
    driver (fx icon) appears under the account.
 
@@ -77,17 +78,17 @@ driver isn't producing values; that's often Auto-Forecast (below), so flag it to
 
 ### Driver types (tested on a plan copy)
 
-*(help)* items: Jirav's [Standard Drivers](https://help.jirav.com/standard-drivers) article.
+Rules below come from live tests and Jirav's own calculation code; help article: [Standard Drivers](https://help.jirav.com/standard-drivers).
 
 | Type | Inputs | Behaviour |
 |---|---|---|
-| Annual Target | Fiscal Year(s) (All Forecast Years / a year / Custom Range) · Annual Amount · Allocation (Even split / Seasonality of prior year) · Add Explicit Spend | Spreads what's left of the target over the forecast months, after subtracting **that department's** actuals for the year. 1.2M for FY22 on Unassigned (no actuals) gave 171,428.57 × 7 months. *(help)* Amount must be positive. Once YTD actuals pass the target, every remaining month is **0**: say so when actuals are running hot |
-| Fixed Spread | Fiscal Year(s) · Annual Amount · Allocation (Even split / Seasonality of prior year) · Add Explicit Spend | *(help)* Spreads the amount once and **ignores actuals**: 12,000 → 1,000 a month; with 2,700 of actuals in Jan–Feb the year ends at 12,700, not 12,000. Amount must be positive |
-| Growth on Historicals | Growth type (Historical Period Over Period % Change) · Base: Same Month Last Year / Last Year (Full Year) / Constant | Needs two years of history. Without it, a confirm dialog warns; Continue saves with 0% growth, so each month repeats the same month last year. *(help)* The rate is last year's total ÷ the year before's (12,000 vs 10,000 = 20%), applied to the base: Feb last year 1,200 → 1,440. Base Last Year (Full Year) adds an Allocation (Even / Seasonality) |
+| Annual Target | Fiscal Year(s) (All Forecast Years / a year / Custom Range) · Annual Amount · Allocation (Even split / Seasonality of prior year) · Add Explicit Spend | Spreads what's left of the target over the forecast months, after subtracting **that department's** actuals for the year. 1.2M for FY22 on Unassigned (no actuals) gave 171,428.57 × 7 months. Even split = (target − Explicit Spend months − that year's actuals) ÷ the remaining forecast months; once YTD actuals pass the target, every remaining month is **0** (never negative): say so when actuals are running hot. A typed amount must be above 0 (an assumption can be 0) |
+| Fixed Spread | Fiscal Year(s) · Annual Amount · Allocation (Even split / Seasonality of prior year) · Add Explicit Spend | (amount − Explicit Spend) ÷ 12, in forecast months only: it **ignores actuals**, and the shares for months already in actuals are dropped. 12,000 → 1,000 a month; with 2,700 of actuals in Jan–Feb the year ends at 12,700, not 12,000. A typed amount must be above 0 |
+| Growth on Historicals | Growth type (Historical Period Over Period % Change) · Base: Same Month Last Year / Last Year (Full Year) / Constant | Needs two years of history. Without it, a confirm dialog warns; Continue saves with 0% growth, so each month repeats the same month last year. Growth = (last year's total − the year before's) ÷ the year before's (12,000 vs 10,000 = 20%), applied to the base: Feb last year 1,200 → 1,440. It's 0% if either year starts before the plan does. Base Last Year (Full Year) adds an Allocation (Even / Seasonality) |
 | Periodic Growth | Periodic # or % Increase · "Increase by X every N Month(s)" · first increase: In Forecast / Relative Month / Specific Month · Base: Actuals (last month, last 3/6/12 avg, last quarter/half, since last year, this year) / Constant / Custom | Steps count from the last actual month: 10% every 3 months on a 2,600 base gave 2,600 Jun–Jul, 2,860 from Aug, 3,146 from Nov |
 | Amount per Headcount | Amount · Cumulative or New headcount · Headcount Department (All / This Department / one) | 100 × headcount, per department (24 staff → 2,400). The amount can be an assumption |
 | % of Another Account | Select Account (account + department, "This …" allowed) · percentage (type 10 for 10%) · optional Create Assumption | 10% of Revenue → COGS = 10% of that month's revenue |
-| Custom | Input 1 · fx (+ − × ÷) · Input 2; each input an account, headcount, custom line, assumption or constant ([variable picker](variable-picker.md)) | A flat amount = Constant × Constant 1 (verified). Div/0 (default On) handles ÷ 0. Example: Advertising = Revenue (This Department) × an assumption |
+| Custom | Input 1 · fx (+ − × ÷) · Input 2; each input an account, headcount, custom line, assumption or constant ([variable picker](variable-picker.md)) | A flat amount = Constant × Constant 1 (verified). Div/0 (default On: ÷ 0 gives 0) handles ÷ 0. Example: Advertising = Revenue (This Department) × an assumption |
 
 ### Driver inputs
 
@@ -99,13 +100,19 @@ Each input is chosen in the [variable picker](variable-picker.md).
    right. ⚠️ Rows labelled **[GL]** are global drivers: ✎ and 🗑 there change them **for every
    plan** (see [global-drivers.md](global-drivers.md)).
 2. ✎ → the same editor ("Edit This Driver") → change it → **Save** → toast "Driver updated".
-   *(help)* The **type can't be changed**: to switch (say Growth on Historicals → Amount per
+   The **type can't be changed** (the edit form shows it read-only): to switch (say Growth on Historicals → Amount per
    Headcount), delete the driver and add a new one. Propose both steps together.
 3. 🗑 → "Delete Driver: Are you sure…?" → **Yes**. No toast follows: verify with `listPlanDrivers`.
    ✎ and 🗑 are icons at the Formula bar's right end: take their position from a screenshot.
 
 A driver's type can't be changed: delete it and add a new one. The row's **⋯** also has Edit
-Driver, Clone Driver, Clone, Clone To and Delete Driver.
+Driver, Clone Driver, Clone, Clone To and Delete Driver. *(help)* **Clone Driver** copies it onto
+the same account and department (edit the copy afterwards); **Clone Driver To** opens a New Driver
+form with the settings filled in and **Apply to Account(s) & Department(s)** empty. Double-clicking
+a driver row also opens Edit. The edit form's **Edit All Drivers With Same Inputs** toggle applies
+the change to every driver with identical inputs: leave it off unless the user means all of them.
+Several driver rows can be selected and deleted together. Many drivers at once: one Add Driver with
+several accounts or departments in **Apply to**.
 
 Several drivers on one line **add up**, including [GL] global drivers (plan 5 + global 7 = 12,
 verified).
@@ -116,13 +123,16 @@ If Auto-Forecast is on for the plan and covers the account ([plans.md → Auto-F
 
 - **Inside a group:** the drivers stay, but produce nothing (`misconfigured: true` in
   `jirav.listPlanDrivers`); the group's **Auto-Forecast** line supplies the values.
-- **On a top-level account:** the driver still counts, and the Auto-Forecast line is added on top
-  (driver 8,091 + forecast 500 = 8,591).
+- **On a top-level account:** typed values stay and the Auto-Forecast line is added to them.
+  Drivers there may stop (`misconfigured: true`) or keep counting; both have been seen. After
+  turning it on, read `misconfigured` for each driver on the lines the user cares about.
+- While it's on, the account rows have no **⋯** menu (Actions → Add New → Driver still shows).
 
-Turning Auto-Forecast off for the plan brings the drivers back. So before adding a driver, check
-`(await jirav.getAutoForecast(planId)).plan.enabled`. If it's on, ask the user whether to turn it
-off for this plan, or to exclude the account in the company's Custom Auto-Forecast settings
-([plans.md → Auto-Forecast](plans.md#auto-forecast)).
+Turning Auto-Forecast off for the plan brings the drivers back (values identical to before,
+verified). So before adding a driver, check `(await jirav.getAutoForecast(planId)).plan.enabled`.
+If it's on, ask the user whether to turn it off for this plan, or to switch the account off in the
+company's Custom Auto-Forecast settings, which keeps the account's drivers working
+([forecast-settings.md](forecast-settings.md); company-wide: every plan with Auto-Forecast on).
 
 ## Drivers that read their own line
 
@@ -156,5 +166,4 @@ Balance Sheet, CapEx, Allocation and Staffing drivers live in inline grids on th
 
 ## Not yet covered
 
-- Custom-table, Output and KPI-based driver inputs beyond Constant and account elements.
-- Whether Min Date drivers override imported actuals.
+- Custom-table and KPI-based driver inputs (Constant, account elements and Output are covered).
