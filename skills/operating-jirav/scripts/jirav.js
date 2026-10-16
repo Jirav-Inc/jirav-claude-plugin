@@ -9,7 +9,7 @@
 // After a full page load (navigate, reload, switching company) the globals are gone. ONE line
 // restores the core and every block that was loaded in this tab:
 //
-//   location.host !== 'app.jirav.com' ? 'WAIT: on '+location.host+', not app.jirav.com yet: retry in a few seconds' : (typeof jirav !== 'undefined' && jirav.build === '8038ac4c') ? jirav.status() : (localStorage.jiravKit || '').includes("KIT_BUILD='8038ac4c'") ? (0, eval)(localStorage.jiravKit) : 'PASTE scripts/jirav.min.js (not cached in this browser, or out of date)'
+//   location.host !== 'app.jirav.com' ? 'WAIT: on '+location.host+', not app.jirav.com yet: retry in a few seconds' : (typeof jirav !== 'undefined' && jirav.build === '7a85fc9b') ? jirav.status() : (localStorage.jiravKit || '').includes("KIT_BUILD='7a85fc9b'") ? (0, eval)(localStorage.jiravKit) : 'PASTE scripts/jirav.min.js (not cached in this browser, or out of date)'
 //
 // Blocks add page-specific helpers: one function mounted on jirav, or a namespace when there are several.
 // Paste a block file after the core when jirav.page() suggests it:
@@ -20,6 +20,7 @@
 // jirav.help() lists everything that's loaded.
 //
 // ── Core ─────────────────────────────────────────────────────────────────────────────
+//   jirav.fetch(url, opts)          fetch, limited to https://*.jirav.com (every kit and block request goes through it)
 //   jirav.page()                    where am I? -> {tenant, area, planId?, planPage?, reportSlug?, reportPage?, blocks:{name: loaded?}}
 //   Lookups. Each takes an optional company name as its last argument (default: the company in the URL).
 //   jirav.listTenants() / jirav.getTenant(name?)  companies; API base = `${apiServerURI}/${tenantId}`
@@ -70,6 +71,8 @@
 //   jirav.drag(fromEl, toEl, {where:'before'|'after'})   drag-reorder within one list (see block docs)
 
 function __jiravKit() {
+// Runs only in a Jirav tab, and (below) talks only to Jirav: what the plugin's README promises.
+if (location.protocol !== 'https:' || location.hostname !== 'app.jirav.com') throw new Error(`The Jirav kit only runs on https://app.jirav.com (this page is ${location.host}): open Jirav first.`);
 const KIT_VERSION = '0.2.0';
 const KIT_BUILD = 'dev';   // stamped by tools/build-min.sh: a hash of every kit file, so any edit invalidates cached copies
 var jirav = (() => {
@@ -79,8 +82,14 @@ var jirav = (() => {
     root.querySelectorAll('*').forEach(e => { if (e.shadowRoot) deepAll(e.shadowRoot, sel, out); });
     return out;
   };
+  // Every request the kit (and its blocks, via jirav.fetch) makes: Jirav hosts over https only.
+  const jfetch = (url, opts) => {
+    const u = new URL(url, location.href);
+    if (u.protocol !== 'https:' || !/(^|\.)jirav\.com$/.test(u.hostname)) throw new Error(`The Jirav kit only connects to jirav.com hosts, not ${u.host}.`);
+    return fetch(u.href, opts);
+  };
   const get = async url => {
-    const r = await fetch(url, { credentials: 'include' });
+    const r = await jfetch(url, { credentials: 'include' });
     if (!r.ok) throw new Error(`GET ${url} -> ${r.status}${r.status === 401 || r.status === 403 ? ' (session expired? ask the user to sign in)' : ''}`);
     return r.json();
   };
@@ -204,7 +213,7 @@ var jirav = (() => {
   // assumption values and for which months hold actuals. The kit's only other POST is the audit-log read.
   const readModelTable = async (model, table, company) => {
     const t = await getTenant(company);
-    const r = await fetch(`${t.base}/v1/model/plan/${model}/tables/content?tables=${encodeURIComponent(table)}`,
+    const r = await jfetch(`${t.base}/v1/model/plan/${model}/tables/content?tables=${encodeURIComponent(table)}`,
       { method: 'POST', credentials: 'include', headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } });
     if (!r.ok) throw new Error(`table ${table} of ${model} -> ${r.status}`);
     return (await r.json())[table] || {};
@@ -224,7 +233,7 @@ var jirav = (() => {
     const H = { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' };
     const limit = opts.limit || 2000, out = [];
     for (let off = 0; off < limit; off += 100) {
-      const r = await fetch(`${t.base}/v1/audit-query/find`, { method: 'POST', credentials: 'include', headers: H,
+      const r = await jfetch(`${t.base}/v1/audit-query/find`, { method: 'POST', credentials: 'include', headers: H,
         body: JSON.stringify({ fields, paging: { limit: 100, offset: off }, sorting: [{ event_time: 'desc' }] }) });
       if (!r.ok) throw new Error(`audit log -> ${r.status}`);
       const page = await r.json(); out.push(...page);
@@ -413,7 +422,7 @@ var jirav = (() => {
     return out;
   };
   const getDataStatus = async (company) => {
-    const t = await getTenant(company), raw = async p => { try { const r = await fetch(t.base + p, { credentials: 'include' }); return { ok: r.ok, body: await r.json().catch(() => null) }; } catch (e) { return { ok: false, body: null }; } };
+    const t = await getTenant(company), raw = async p => { try { const r = await jfetch(t.base + p, { credentials: 'include' }); return { ok: r.ok, body: await r.json().catch(() => null) }; } catch (e) { return { ok: false, body: null }; } };
     const last = async p => { const r = await raw(p); return r.body && r.body.lastImport ? String(r.body.lastImport).slice(0, 10) : null; };
     const [acc, ping, wf, coa, tb, budget, staff, ctActuals, ctBudget, gsheet, periods] = await Promise.all([
       raw('/v1/dataSources/accounting'), raw('/v1/import/accounting/ping'), raw('/v1/dataSources/workforce/selected-data-source'),
@@ -480,7 +489,7 @@ var jirav = (() => {
   const getCompanySettings = async (company) => {
     const g = p => api(p, company).catch(() => null);
     const [info, cur, labels, method, close, imp, aging, re, plansCfg, staff, coa, per] = await Promise.all([g('/v1/companyInfo'),
-      g('/v1/company-setup/currency'), g('/v1/labels'), getTenant(company).then(t => fetch(t.base + '/v1/company-setup/accounting-method', { credentials: 'include' })).then(r => r.ok ? r.text() : null).then(x => x && x.replace(/"/g, '').trim(), () => null), g('/v1/company-setup/close-month'),
+      g('/v1/company-setup/currency'), g('/v1/labels'), getTenant(company).then(t => jfetch(t.base + '/v1/company-setup/accounting-method', { credentials: 'include' })).then(r => r.ok ? r.text() : null).then(x => x && x.replace(/"/g, '').trim(), () => null), g('/v1/company-setup/close-month'),
       g('/v1/company-setup/import-setup'), g('/v1/company-setup/import-aging-detail'), g('/v1/company-setup/retained-earnings-override'),
       g('/v1/plansConfiguration'), g('/v1/staffingConfig'), getChartOfAccounts(company), getPeriods(null, company).catch(() => ({}))]);
     const acct = id => { if (id == null) return null; for (const sec of coa) { const a = sec.accounts.find(x => String(x.key) === String(id)); if (a) return a.name; } return String(id); };
@@ -800,7 +809,7 @@ var jirav = (() => {
     here: page(),
   });
 
-  return { version: KIT_VERSION, build: KIT_BUILD, help, status, page,
+  return { version: KIT_VERSION, build: KIT_BUILD, help, status, page, fetch: jfetch,
     listTenants, getTenant, listDashboards, listReports, listReportPages, listPlans, listCustomTables, listPlanDrivers,
     listGlobalDrivers, listArchivedPlans, getSubscription, listAssumptions, listAssumptionValues, readAuditLog, listDateRanges, listDepartments, listStaff, getChartOfAccounts, getDepartmentMappings, getLimits, listGoals, listUsers, getVarianceRules, getCashFlowSetup, listReportSources, getReportSetup,
     listDashboardTiles, getTileValues, getDataStatus, getPeriods, getAutoForecast, getArApSettings, getSystemHealth, getCompanySettings, ready, busy, waitIdle, saveBar, alerts, dismissAlerts, autoDismiss, readTableRows, go, pageLinks,

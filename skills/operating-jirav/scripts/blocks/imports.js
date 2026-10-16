@@ -21,6 +21,8 @@
 //                                    budgets: arms the file and opens Import Budget Data; then ONE real click
 //                                    inside the dialog (it waits for a user event), then:
 //   im.finish(planName)           -> budgets: picks the plan, presses UPLOAD TEMPLATE, returns the result
+//   im.templateLink(kind)        -> {x, y}   the card's Template link (accountingActuals: a blank file outside jirav.com
+//                                    that the kit doesn't fetch; the user attaches the download)
 //   im.accountingCheck(i)         -> accountingActuals: {source, months, accounts, removes, adds, emptyTabs}
 //                                    removes = Jirav accounts the file's COA leaves out (deleted from EVERY month)
 //   im.dropSheets(i, [names])     -> {i, ...}   new file without those tabs (an empty optional tab fails the import)
@@ -36,16 +38,10 @@ jirav.block('imports', 'dev', (jirav) => {
     customActuals: { card: 'customLines', template: () => '/v1/import/customLines/file/template/xlsx' },
     budget: { card: 'budgets', plan: true, template: p => `/v1/import/budget/file/template/xlsx/plan/${p}` },
     customBudget: { card: 'customLinesBudget', plan: true, template: p => `/v1/import/customLines/budget/file/template/plan/${p}` },
-    // Jirav's GL actuals template is a static, BLANK file (not prefilled), one of three versions chosen by company
-    // features, exactly as the card's Template link chooses it. For monthly imports start from the user's last file.
-    accountingActuals: { card: 'accounting-manual', external: true },
-  };
-  const HUB = 'https://2567042.fs1.hubspotusercontent-na1.net/hubfs/2567042/';
-  const accountingTemplateUrl = async () => {
-    const t = await jirav.getTenant(), f = await (await fetch(t.base + '/v1/config/features', { credentials: 'include' })).json();
-    return f.categoryDimensionInBS ? HUB + 'Excel%20Import%20Templates/Excel_Accounting_Import_Template_v1.2.xlsx'
-      : f.categoryDimensionRenaming ? HUB + 'Excel%20Import%20Templates/Excel_Accounting_Import_Template_v1.1.xlsx'
-      : HUB + 'Excel%20Import%20Template/Excel%20Accounting%20Import%20Template.xlsx';
+    // Jirav's GL actuals template is a static, BLANK file served by the card's Template link (a plain link to a file
+    // host outside jirav.com), so the kit doesn't fetch it: Claude clicks the link, the browser saves it to the user's
+    // Downloads, and the user drags it into the conversation (then fromBase64). Monthly imports start from their last file.
+    accountingActuals: { card: 'accounting-manual', manualTemplate: true },
   };
   // GL actuals by Excel only where the company's accounting source is JiravExcel, or where there is none yet (the
   // first import then MAKES JiravExcel the source, and only Jirav support can change it back). With a connector
@@ -71,18 +67,12 @@ jirav.block('imports', 'dev', (jirav) => {
   const template = async (kind, { planId } = {}) => {
     const k = kindOf(kind);
     if (kind === 'staff') await staffSource();
-    if (kind === 'accountingActuals') {
-      await accountingSource();
-      const url = await accountingTemplateUrl(); let r;
-      try { r = await fetch(url); } catch (e) { throw new Error(`Template download failed (${e.message}): ask the user to download it from the Manual import card's Template link and attach it, then fromBase64.`); }
-      if (!r.ok) throw new Error(`Template download failed: ${r.status}. Ask the user for the file from the card's Template link.`);
-      return keep(new Blob([await r.arrayBuffer()], { type: XLSX }), 'accountingActuals-template.xlsx');
-    }
+    if (k.manualTemplate) throw new Error(`The ${kind} template isn't fetched by the kit: click the card's Template link (im.templateLink('${kind}')), ask the user to drag the downloaded file into the conversation or give access to their Downloads folder, then fromBase64. For a monthly import, ask for their last import file instead.`);
     if (k.plan && !planId) throw new Error(`template('${kind}') needs {planId} (jirav.listPlans()).`);
     const t = await jirav.getTenant();
     const noStaff = 'The staff template can\'t be fetched by script when the company has no staff list yet (it redirects to a download): build the first file from the column list in references/imports.md and use fromBase64.';
     let r;
-    try { r = await fetch(t.base + k.template(planId), { credentials: 'include' }); }
+    try { r = await jirav.fetch(t.base + k.template(planId), { credentials: 'include' }); }
     catch (e) { throw new Error(kind === 'staff' ? noStaff : `Template request failed: ${e.message}`); }
     if (!r.ok) throw new Error(kind === 'staff' ? `${noStaff} (status ${r.status})` : `Template request failed: ${r.status}`);
     return keep(new Blob([await r.arrayBuffer()], { type: XLSX }), `${kind}${planId ? '-' + planId : ''}-template.xlsx`);
@@ -308,6 +298,16 @@ jirav.block('imports', 'dev', (jirav) => {
     const since = new Date().toISOString(); up.click();
     const a = await waitAlert(since); return { ok: a.some(x => x.startsWith('success')), result: a };
   };
+  // Point of the card's Template link, for a real click (the browser saves the file to Downloads).
+  const templateLink = async kind => {
+    const k = kindOf(kind);
+    if (kind === 'accountingActuals') await accountingSource();
+    const btn = card(k), box = btn.closest('import-provider, file-import-provider, .provider, .card') || btn.parentElement.parentElement.parentElement;
+    const a = [...box.querySelectorAll('a')].find(x => /template/i.test(x.textContent));
+    if (!a) throw new Error('No Template link on this card.');
+    a.scrollIntoView({ block: 'center' });
+    return { ...jirav.at(a), next: 'Real-click it; the browser saves the template to Downloads. Ask the user to drag it in or give access to their Downloads folder.' };
+  };
   // GL actuals file vs what Jirav holds. Accounts compare by name (unique in a Jirav chart; the API doesn't expose
   // the file's Account IDs in auto mapping). Retained Earnings / Unmapped are Jirav's own and never "removed".
   const accountingCheck = async i => {
@@ -345,5 +345,5 @@ jirav.block('imports', 'dev', (jirav) => {
     }
     return keep(await zip(ents), o.f.name.replace(/(\.xlsx)?$/, '-trimmed.xlsx'));
   };
-  return { template, fromBase64, rows, findRow, monthColumn, edit, blankNumbers, accountingCheck, dropSheets, upload, finish, result, list, readBase64 };
+  return { template, fromBase64, rows, findRow, monthColumn, edit, blankNumbers, accountingCheck, dropSheets, templateLink, upload, finish, result, list, readBase64 };
 }, 'Excel imports without the file chooser: templates, in-page cell edits, upload (CHANGES DATA)');

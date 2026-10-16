@@ -48,20 +48,37 @@ Updates arrive when Jirav publishes a new version (each release is listed under 
   department. It keeps payroll from being counted twice when your staff roster already drives salaries,
   leaves Balance Sheet balances intact, asks before uploading and checks the result.
 
+## What this plugin runs and connects to
+
+- **No hooks, MCP servers, commands or installs.** The plugin is skills (Markdown instructions) plus a
+  JavaScript helper, the "kit", in `skills/operating-jirav/scripts/`: `jirav.js` and `blocks/*.js` with
+  comments, and `*.min.js`, the same code without comments (not obfuscated), which is what Claude pastes.
+- **Where it runs:** only inside your own signed-in Jirav browser tab (Claude in Chrome or Cowork's
+  browser). Nothing runs on your computer outside that tab.
+- **What it connects to:** only Jirav: `app.jirav.com` and your company's Jirav API host
+  (`*.jirav.com`), with your existing session. Some reads use POST, as Jirav's own pages do. It has no
+  other network destinations, sends nothing elsewhere, and stores no credentials. The kit enforces this
+  itself: it refuses to load on any page other than `https://app.jirav.com`, and every request it makes
+  goes through one function that refuses any host that isn't `https://…jirav.com`.
+- **How it changes data:** through Jirav's own screens (Claude clicks, types and saves), and only after
+  you approve each change. Imports go through Jirav's own import cards and checks.
+- **Inside the tab:** to read Jirav's own Excel and PDF exports without a save dialog, the exports
+  helper briefly intercepts the page's download calls (`URL.createObjectURL` and download-link clicks)
+  for files Jirav creates, and restores them when released. To hand an import file to Jirav's upload
+  code without the system file picker, the imports helper intercepts the file input's click once.
+  Neither touches anything outside the Jirav tab.
+- **Stored in the browser:** a copy of the kit in the tab's `localStorage`, so it doesn't have to be
+  pasted again after a page reload. It is re-run from there only when its build matches the copy that
+  ships with the plugin; otherwise it's discarded and Claude pastes the current one.
+
 ## Data and privacy
 
-- **How it works:** operating-jirav includes a small JavaScript helper that Claude runs in your Jirav
-  browser tab. It reads the page and calls Jirav's own API on the same site, and nothing else. It ships
-  as readable source in `skills/operating-jirav/scripts/`: `jirav.js` and `blocks/*.js` with comments,
-  and the `*.min.js` copies Claude pastes are the same code with the comments removed (not obfuscated).
-- **Where data goes:** only to Jirav (app.jirav.com and its API), in your own signed-in browser session.
-  The plugin has no connectors, servers or other outside services of its own.
+- **Where data goes:** only to Jirav, in your own signed-in browser session.
 - **What it reads:** whatever your Jirav login can see, which can include personal data such as staff
   names and salaries, and Jirav users' names and emails.
 - **What it writes:** only the changes you approve (plan values, drivers, custom tables, imports). They
   are saved in your Jirav account and kept under your agreement with Jirav.
-- **What it stores:** nothing outside Jirav. The only thing kept in your browser is the plugin's own
-  script, so it doesn't reload on every page.
+- **What it stores:** nothing outside Jirav, apart from the kit copy in your browser described above.
 - **Privacy:** [Jirav Privacy Policy](https://www.jirav.com/privacy-policy).
 
 ## Support and license

@@ -40,7 +40,7 @@ They don't save: you click, type and Save at the coordinates they return (`jirav
 - **Start every browser call with the restore line.** It reloads the kit cached in this browser
   (across reloads, tabs and sessions) while the files here are unchanged:
   ```js
-  location.host !== 'app.jirav.com' ? 'WAIT: on '+location.host+', not app.jirav.com yet: retry in a few seconds' : (typeof jirav !== 'undefined' && jirav.build === '8038ac4c') ? jirav.status() : (localStorage.jiravKit || '').includes("KIT_BUILD='8038ac4c'") ? (0, eval)(localStorage.jiravKit) : 'PASTE scripts/jirav.min.js (not cached in this browser, or out of date)'
+  location.host !== 'app.jirav.com' ? 'WAIT: on '+location.host+', not app.jirav.com yet: retry in a few seconds' : (typeof jirav !== 'undefined' && jirav.build === '7a85fc9b') ? jirav.status() : (localStorage.jiravKit || '').includes("KIT_BUILD='7a85fc9b'") ? (0, eval)(localStorage.jiravKit) : 'PASTE scripts/jirav.min.js (not cached in this browser, or out of date)'
   ```
 - **PASTE**: paste the whole of `scripts/jirav.min.js` with `javascript_tool` on any app.jirav.com page (even
   the company picker). `scripts/jirav.js` is the readable, documented source: read it, don't paste it.

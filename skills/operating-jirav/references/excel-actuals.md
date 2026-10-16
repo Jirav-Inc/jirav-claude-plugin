@@ -16,9 +16,13 @@ company gets actuals. The kit enforces the rules below; `upload` refuses otherwi
 | none | The first import **makes Excel the company's actuals source** and greys out every connector; only Jirav support can change it back. Say so, get a yes, then `upload('accountingActuals', i, {firstImport: true})`. |
 | a connector (QuickBooks, Xero…) | Not possible: the Manual import card is disabled and the kit refuses. Actuals come from that system. |
 
-1. **Start from the user's last import file** (ask for it: Jirav doesn't give it back, and the API doesn't
-   show its Account IDs). For a company's first import, `im.template('accountingActuals')` fetches Jirav's
-   template (the same version as the card's Template link).
+1. **Start from the user's last import file**: they drag it in or give folder access (as below), then
+   `im.fromBase64` (Jirav doesn't give it back, and the API doesn't show its Account IDs). **First import
+   only:** on Settings → Integrations, real-click the Manual import card's **Template** link
+   (`await im.templateLink('accountingActuals')` gives its point). The browser saves the blank template to
+   the user's Downloads (the kit doesn't fetch it: it's on a file host outside jirav.com). Let the user
+   choose: drag it into the conversation, or give Claude access to their Downloads folder (Cowork asks
+   for the folder; in Claude Code, its path) and Claude reads it from there. Then fill it in together.
 2. Tabs (data from row 5): **COA** (Account ID, Parent ID, Account Name, Class, Category, Function,
    Number), **Income Statement** (Account ID, Department ID, Calendar Month, Amount: that month's
    activity), **Balance Sheet** (Account ID, Calendar Month, Balance: month-end balance, no YTD
@@ -31,6 +35,8 @@ company gets actuals. The kit enforces the rules below; `upload` refuses otherwi
    If the user means it, name them, get a yes and pass `{removes: [...]}`; otherwise add them back.
    `adds`: new accounts (fine; check Class and Category).
 5. Confirm (company, months, accounts), `await im.upload('accountingActuals', i)` → Jirav's result.
+   Then give the user the file that was imported (`im.readBase64(i)` into the workspace) and tell them to
+   **keep it for next month**: the next import starts from it.
 6. Verify: `getDataStatus()` → `source: 'JiravExcel'`, Chart of Accounts / Trial Balance last import =
    today, `actualsThrough` = the last month in the file; then the plan's Balance Sheet for that month
    balances. Without a Company Setup tab the close month falls back to the current month (seen); its

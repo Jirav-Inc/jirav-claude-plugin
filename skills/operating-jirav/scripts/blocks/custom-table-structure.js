@@ -107,7 +107,7 @@ jirav.block('customTableStructure', 'dev', (jirav) => {
     const t = (await jirav.listCustomTables()).find(x => x.name === name);
     if (!t) throw new Error('Could not tell which table is open.');
     const { base } = await jirav.getTenant();
-    const r = await fetch(`${base}/v1/customTable/${t.id}`, { credentials: 'include' }).then(r => r.json());
+    const r = await jirav.fetch(`${base}/v1/customTable/${t.id}`, { credentials: 'include' }).then(r => r.json());
     const walk = e => { const k = Object.keys(e)[0], v = e[k];
       const label = v.label || (k === 'separator' ? '(blank row)' : k === 'lineReference' ? `(reference ${v.address && v.address.category})` : '');
       const s = { type: k, id: v.id, label }; if (v.format) s.format = v.format; if (v.aggregation) s.periodValue = v.aggregation;
