@@ -9,6 +9,8 @@ Takes the user's budget file and loads it into a Jirav plan through Settings →
 
 **The numbers always come from the user's file.** Never invent, extrapolate or "fill in" budget values. No file, no import: ask for it. A line or month the file doesn't have stays blank, and you say so.
 
+**Ask, don't assume.** Budget files are messy, and a wrong guess loads a wrong budget that looks right. Every decision listed in [section 4, Questions](#questions-one-batched-list) is the user's: ask it, in **one numbered list**, before you build the mapping. Never resolve one by picking the "obvious", "preferred", first, middle or best-tying option, and never decide it inside a proposal the user is only asked to approve.
+
 Runs on top of the `operating-jirav` skill: use its kit (the restore line, the `jirav.imports` block, `readGridValues`, `listPlanDrivers`) and its Edits rules (propose once, get an explicit yes, verify, log). The user signs in; never type credentials.
 
 ## When to use
@@ -27,7 +29,15 @@ Runs on top of the `operating-jirav` skill: use its kit (the restore line, the `
      - **CFO**: a new plan for the budget is **Add New Plan** ([plans.md → Periods](../operating-jirav/references/plans.md#periods-and-manage-plans-columns)): set the actuals to end the month before the budget year and the forecast to the budget year, then Save. At the 5-active-plan limit, ask which plan to archive; if it's the Current PoR, say what reports will show instead ([plans.md → Plan of record](../operating-jirav/references/plans.md#plan-of-record-and-other-plan-facts)).
    - Check `getAutoForecast(planId).plan.enabled`. A budget plan normally has Auto-Forecast off: while it's on, it hides typed values and drivers on accounts inside a group (the elimination driver and imported budget values included), adds to typed values on top-level accounts (drivers there may stop: check `misconfigured`), and zeroes System Salaries.
 2. **Departments.** `getSubscription().departments` says whether the company has departments. If it does, use `jirav.listDepartments()` and `getDepartmentMappings()`: the template has one row per account × master department, so departments must be set before the import.
-3. **The user's file.** Read it in the workspace (the `xlsx` skill, or Python), not in Jirav. Find its account labels, its department labels (a column, a sheet per department, or none) and its month columns. A file with no departments, in a company that has them: ask which department each section goes to; don't guess. Prior-year actuals are **not** needed: the file is the budget.
+3. **The user's file.** Read it in the workspace (the `xlsx` skill, or Python), not in Jirav. Read **every** tab, hidden ones included. List:
+   - its account labels, and which rows are the file's own **subtotal or total rows** (Total Revenue, Gross Profit, Total OpEx, EBITDA, Net Income, Total <department>…) and total columns (quarters, FY). These are never imported: they are what you tie out to.
+   - its department labels (a column, a block or sheet per department, or none)
+   - its period columns, and what calendar month each is
+   - every set of alternative numbers: scenarios, versions, cases, a scenario switch cell, older or hidden tabs
+   - its units (a "$000" label, or none) and sign convention (expenses positive or negative, contra lines, net lines with mixed signs)
+   - any Balance Sheet lines
+
+   Prior-year actuals are **not** needed: the file is the budget. The last actual month's values are useful only to sanity-check units.
 4. **Balance Sheet baseline.** On the Assets, Liabilities and Equity pages (Department filter All), record every account's balance for the last actual month and the first forecast month. This is what Verify compares against.
    - **Check the plan isn't already wiped.** Balances normally carry forward, except where Jirav's own A/R and A/P forecast moves them (System lines). A non-cash account that drops to 0 in the first forecast month, with a typed **Decrease** (or **Increase**, for a negative balance) on its own line equal to its whole last actual balance, was wiped by an earlier import. Tell the user and offer the repair in section 2 **before** importing; otherwise the template comes back with an empty Balance Sheet sheet.
 5. **Staffing.** Check `jirav.listStaff(planId)` and the Salary Expenses account (Settings → Company → Plans; the name varies, e.g. Wages or Salaries and Wages). If staff exist, **System Salaries** already post to that account in every forecast month, by department. The wages rule below applies.
@@ -39,7 +49,7 @@ The template's **Balance Sheet** sheet comes prefilled: each account holds the l
 
 - **Default: leave the Balance Sheet sheet exactly as the template delivers it.** Don't edit it, and don't call `im.blankNumbers` on it.
 - **Template's Balance Sheet sheet is empty** (no numbers from row 6): the plan was already wiped. Stop, tell the user, and run the repair below before building the file.
-- **The user supplies budgeted balances:** fill only those accounts and months, and leave every other cell prefilled.
+- **The user supplies budgeted balances:** fill only those accounts and months, and leave every other cell prefilled. Balance Sheet lines in the file are **not** by themselves a request to load them: ask (Questions, item 9). Never fill Cash or System lines (System Cash, A/R, A/P): Jirav calculates them.
 - **Never blank Balance Sheet cells.** Blank cells are imported as **0**. Every non-cash account (bank sub-accounts, AR, inventory, fixed assets, liabilities, equity) then drops to zero for the whole forecast, and System Cash absorbs the difference.
 - Always fetch a **fresh** template right before building, because the prefilled balances reflect the latest actuals.
 
@@ -53,7 +63,7 @@ The template's **Balance Sheet** sheet comes prefilled: each account holds the l
 
 If System Salaries are already set (staff imported, salaries flowing to the Salary Expenses account), importing a budget that also carries wages **double-counts payroll**. In the test account, imported wages of $371,300 plus System Salaries of $354,000 showed as $725,300 a month.
 
-Do one of the following, for **each department**.
+The approach is the user's choice (Questions, item 8): offer all three below, say Option 1 is recommended, and wait for the answer. Then do it for **each department**.
 
 ### Option 1 (preferred): eliminate System Salaries with a driver
 
@@ -86,7 +96,7 @@ Put budget wages minus System Salaries in the Wages cells for each department an
 
 If the user wants the **roster to own wages**, leave the Wages cells blank in the Income Statement sheet (blank Income Statement cells don't clear anything). Neither option is needed then, but say so in the proposal.
 
-Always state which approach you're taking. Never import wages on top of System Salaries silently.
+Never pick the approach yourself, and never import wages on top of System Salaries.
 
 ## 4. Build the file
 
@@ -119,27 +129,57 @@ Fill all Income Statement cells in one `im.edit(t.i, 'Income Statement', {cell: 
 
 **Keep the inputs.** The in-page file is lost on any page load, and `im.readBase64` can't write into the cloud workspace by itself. Keep the edits object (or the user's source file) so the file can be rebuilt, and upload in the same page session as the build.
 
-**Morph the user's file into the template** (in the workspace, before touching Jirav):
-1. **Map accounts:** each line of the user's file → a template `B` (Account Name). Match exact names first, then obvious variants ("Salaries" → Wages). Every mapping that isn't exact goes in the proposal for the user to confirm.
-2. **Map departments:** each line → a template `D` (master department). Use the file's own department labels; if the file has none, the departments the user named in step 1.3.
-3. **Map months:** the file's month columns → the template's forecast-month columns. Months in the file outside the plan's forecast window can't be imported: list them. Annual-only figures: ask how to spread them (evenly, or by a pattern the user gives); never pick one silently.
-4. **Normalise signs** to the template's conventions (above), and roll several file lines that map to one account × department into one value (say which).
-5. **Unmapped lines:** list every line, with its annual total, that has no account or department in Jirav. Never drop one silently. The user decides: map it to an existing account, or add the account in Jirav first.
-6. **Tie out:** the mapped totals by section must equal the file's totals by section, less only the listed unmapped lines.
+**Morph the user's file into the template** (in the workspace, before touching Jirav), in this order: questions, mapping, tie-out. Don't build the edits object before the questions are answered.
+
+### Questions: one batched list
+
+After section 1 (and the file read in 1.3), send the user **one message** with a numbered list of every question that applies. Each question names the file lines (with annual totals) and the Jirav options, offers a recommendation where you have one, and is a question, not a statement. Ask, whenever:
+
+1. **Alternative numbers.** The file has more than one scenario, version, case, block or tab for the same lines (hidden and "old" tabs included, and even when a switch cell or tab name marks one as active): which is the budget, **for which months** (a budget can take one scenario for some months and another for the rest). Test each candidate against the file's subtotal rows month by month and report what you find as evidence, but never decide by it. Never sum scenarios.
+2. **Units.** No unit label: ask (compare with the last actual month to suggest one). A label ("$000", "in thousands"): state the multiplier in the list for the user to confirm.
+3. **Periods.** Columns that are not calendar months (quarters, P1–P12, fiscal labels, a fiscal year not starting in January): confirm which month each is, against the plan window. Quarterly or annual figures: how to spread them to months (evenly, or a pattern the user gives). A **missing** month, or a month that is blank or all zero while the others have values: blank (unbudgeted), zero, or values the user gives. Never interpolate, copy a neighbour, or take it from another tab.
+4. **One line, several possible accounts.** For each file line, list every Jirav account that could hold it, by name **and** by meaning, in any section, including accounts with actuals the line probably covers (e.g. "Software & Subscriptions" → Software, or partly Hosting; "Commissions" → Commissions, or Partner Commissions in COGS; "Travel & Meals" → Travel, Meals & Entertainment, or a split; "Rent & utilities" → Rent and Utilities). An exact name match does not end the search. More than one candidate: ask which, or how to split.
+5. **No account.** A line with no candidate account: map it to an account the user names, add the account in Jirav first, or leave it out. Never drop or map one silently.
+6. **Several lines, one account.** Two or more file lines (or file departments) that would land in the same account × department: list them and ask to confirm the roll-up. Also ask when a dedicated account exists for one of them (Bonus → Bonus Pay or Wages).
+7. **Departments.** A file department that matches no Jirav department, matches several (Sales & Marketing → Sales, Marketing), or is missing (lines with no department, in a company that has departments): ask where each goes. Non-exact one-to-one renames (R&D → Engineering, Ops → Operations) go in the list to confirm.
+8. **Payroll.** The file has wages and System Salaries exist: driver, plug or roster-owned (section 3).
+9. **Balance Sheet lines in the file:** load them as budgeted balances (which accounts), or keep the prefilled balances.
+10. **Signs** the conventions below can't settle: a net line with mixed signs (Interest income (expense), net), or a line whose sign could mean either direction.
+11. **Stacking.** A mapped account already has a driver or typed input in the plan (section 1.6): import on top, replace, or leave that line out.
+
+Questions that don't apply are left out; plain facts (an exact one-candidate match, a normal sign flip of an all-negative expense section) are stated, not asked. If an answer raises a new question, ask it before going on. Controller Essentials' overwrite (step 1.1) is asked first, in the same message.
+
+### Mapping
+
+From the answers:
+1. **Accounts:** each file line → a template `B` (Account Name), as answered.
+2. **Departments:** each line → a template `D` (master department), as answered.
+3. **Months:** the file's period columns → the template's forecast-month columns, as answered. Months outside the plan's forecast window can't be imported: list them.
+4. **Units and signs:** apply the multiplier, then the template's sign conventions (above). Contra-revenue stays negative.
+5. **Roll-ups and splits:** sum the confirmed many-to-one lines; split the confirmed one-to-many lines.
+6. **Never imported:** the file's subtotal and total rows and columns, the scenarios and tabs not chosen, and the lines the user left out. List them.
+
+### Tie-out: month by month, to the file's own subtotals
+
+For **every month** and **every subtotal or total row in the file** (Total Revenue, Gross Profit, Total OpEx, EBITDA, Net Income, Total <department>…), recompute the row from the mapped values (back in the file's units and signs) and compare it with the file's own number. Do the same for any quarter or year total columns. Where the file has no subtotal rows, tie each section's mapped total to the sum of the file's lines, by month.
+
+- A difference is allowed only when it equals lines or months the user chose to leave out: show it as such.
+- Any other difference: stop, show the months and amounts, and ask. Never import a mapping that doesn't tie.
+- Annual totals alone are not a tie-out: one month off in one direction and another off in the other still ties annually.
 
 Then build the edits object from the mapping. Large budgets can be sent in several `im.edit` calls, each on the previous call's file (`im.edit(f.i, …)`); keep the last one.
 
 ## 5. Propose once
 
-One message with:
+After the questions are answered, one message with:
 - the plan and its months
-- a table of totals by section (revenue, COGS, gross margin, OpEx including salaries, operating income) from the user's file, and the same totals as mapped into the template (they must tie)
-- the account and department mappings that weren't exact matches, and every unmapped line with its total
-- the wages approach (driver, plug, or roster-owned blank)
-- the Balance Sheet treatment: carried forward as prefilled, or the user's balances
+- the full mapping: every file line → account × department, with its source (tab, scenario and months), and any multiplier, sign change, spread, roll-up or split; then every line, row, column or month **not** imported, and why
+- the tie-out: a month-by-month table of each file subtotal row against the mapped value (difference 0, or the left-out lines), and the section totals (revenue, COGS, gross margin, OpEx including salaries, operating income) for the year
+- the wages approach the user chose (driver, plug, or roster-owned blank)
+- the Balance Sheet treatment the user chose: carried forward as prefilled, or the user's balances
 - that the import replaces direct line input in **this plan only**
 
-Get an explicit yes. On a first edit in the session, also ask where to keep the build log.
+Get an explicit yes. If the user changes anything, update the mapping and the tie-out and propose again. Never upload before the yes. On a first edit in the session, also ask where to keep the build log (in the questions message).
 
 ## 6. Upload
 
@@ -159,7 +199,7 @@ If the wages driver applies (Option 1), add it now, one per department.
 
 On the plan with the Department filter set to **All**, read the forecast months with `readGridValues({from, to, kind: 'forecast'})` and check:
 
-- Revenue, COGS, OpEx and other income/expense totals equal the user's file (less any unmapped lines the user agreed to leave out).
+- Revenue, COGS, OpEx and other income/expense totals equal the user's file **for every month** (less any lines the user agreed to leave out), and the file's own subtotal rows (Gross Profit, Net Income…) match month by month.
 - Gross margin = revenue − COGS.
 - OpEx = the imported OpEx lines + System Salaries + the elimination drivers (which should net the salaries to zero).
 - Wages = the intended source only: the imported value (with the driver), budget wages (with the plug), or System Salaries only (if roster-owned).

@@ -254,12 +254,14 @@ jirav.block('imports', 'dev', (jirav) => {
       setTimeout(() => this.dispatchEvent(new Event('change', { bubbles: true })), 50);
     };
   };
-  // A blank point in the dialog body: just above its button row (the dialog's centre can be text).
+  // A blank point in the dialog: its padding (top edge first). The plan list only renders after the
+  // real click, so a point picked from what's showing now can land on it; padding never holds a control.
   const blankIn = dlg => {
-    const d = dlg.getBoundingClientRect(), b = [...dlg.querySelectorAll('button')].filter(x => x.getBoundingClientRect().height)
-      .map(x => x.getBoundingClientRect()).sort((p, q) => q.top - p.top)[0];
-    const y = b ? b.top - 20 : d.bottom - 80, x = d.left + d.width * 0.5, k = jirav.frame.width / innerWidth;
-    return { x: Math.round(x * k), y: Math.round(y * k) };
+    const d = dlg.getBoundingClientRect(), k = jirav.frame.k(), cx = d.left + d.width / 2, cy = d.top + d.height / 2;
+    const live = 'button, a, input, textarea, select, label, mat-list-option, [role=option], [role=button], mat-selection-list, mat-icon';
+    const ok = (x, y) => { const h = document.elementFromPoint(x, y); return h && dlg.contains(h) && !h.closest(live); };
+    const p = [[cx, d.top + 8], [d.left + 8, cy], [d.right - 8, cy], [cx, d.bottom - 8]].find(([x, y]) => y > 0 && y < innerHeight && ok(x, y)) || [cx, d.top + 8];
+    return { x: Math.round(p[0] * k), y: Math.round(p[1] * k) };
   };
   const upload = async (kind, i, opts = {}) => {
     if (kind === 'staff') await staffSource();

@@ -18,6 +18,9 @@ read-only. Find tables with `await jirav.listCustomTables()` → `[{id: "custom-
    "Leave site?" prompt; automation doesn't): before leaving, check `jirav.saveBar().pending` is
    false. Reload and re-read to verify.
 
+A section with a Subtotal shows its total on the section row itself (there's no separate Subtotal
+row in the plan): `readGridValues` gives it as that row's values, kind `total`.
+
 Auto-Forecast doesn't change custom-table values (verified).
 
 ## What you type

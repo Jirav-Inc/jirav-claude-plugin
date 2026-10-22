@@ -16,7 +16,7 @@ jirav.block('dashboardLayout', 'dev', (jirav) => {
     const items = [...document.querySelectorAll('li.gridster-item')];
     if (!items.length || typeof angular === 'undefined') throw new Error('No tile grid on this page yet: wait with jirav.ready().');
     const g = angular.element(items[0]).scope().gridster;
-    return { items, g, k: jirav.frame.width / innerWidth };
+    return { items, g, k: jirav.frame.k() };
   };
   const dashboardId = async () => {
     const name = document.title.split(' | ')[0];
@@ -52,17 +52,20 @@ jirav.block('dashboardLayout', 'dev', (jirav) => {
   // scroll (view-only) so both drag points are on screen; a drag too long for one screen comes back as the
   // furthest step that fits, {partial: true}: drag it, then call again with the same target.
   const sleep = ms => new Promise(r => setTimeout(r, ms));
-  const scroller = () => { const { items } = grid();
-    for (let n = items[0].parentElement; n; n = n.parentElement) { const cs = getComputedStyle(n);
-      if (n.scrollWidth > n.clientWidth + 2 && /(auto|scroll)/.test(cs.overflowX)) return n; }
+  // The grid scrolls sideways in one ancestor and up/down in another (section.right, not the window).
+  const scroller = (axis = 'X') => { const { items } = grid(), size = axis === 'X' ? 'Width' : 'Height';
+    for (let n = items[0].parentElement; n && n !== document.documentElement; n = n.parentElement) { const cs = getComputedStyle(n);
+      if (n[`scroll${size}`] > n[`client${size}`] + 2 && /(auto|scroll)/.test(cs[`overflow${axis}`])) return n; }
     return null; };
-  const view = () => { const sc = scroller(), r = sc ? sc.getBoundingClientRect() : { left: 0, right: innerWidth };
-    return { left: Math.max(r.left, 0), right: Math.min(r.right, innerWidth), top: 0, bottom: innerHeight }; };
+  const view = () => { const sc = scroller('X'), r = sc ? sc.getBoundingClientRect() : { left: 0, right: innerWidth };
+    const sy = scroller('Y'), ry = sy ? sy.getBoundingClientRect() : { top: 0, bottom: innerHeight };
+    return { left: Math.max(r.left, 0), right: Math.min(r.right, innerWidth), top: Math.max(ry.top, 0), bottom: Math.min(ry.bottom, innerHeight) }; };
   // Scroll so the CSS-px box [x0,x1]×[y0,y1] (as measured now) is inside the view, as far as it fits.
   const show = async (x0, x1, y0, y1) => {
-    const sc = scroller(), v = view(), m = 8;
+    const sc = scroller('X'), sy = scroller('Y'), v = view(), m = 8;
     if (sc) { if (x1 > v.right - m) sc.scrollLeft += Math.min(x1 - (v.right - m), x0 - (v.left + m)); else if (x0 < v.left + m) sc.scrollLeft -= (v.left + m) - x0; }
-    if (y1 > v.bottom - m) window.scrollBy(0, Math.min(y1 - (v.bottom - m), y0 - m)); else if (y0 < m) window.scrollBy(0, y0 - m);
+    const dy = y1 > v.bottom - m ? Math.min(y1 - (v.bottom - m), y0 - (v.top + m)) : y0 < v.top + m ? y0 - (v.top + m) : 0;
+    if (dy) sy ? (sy.scrollTop += dy) : window.scrollBy(0, dy);
     await sleep(350);
   };
   const elOf = t => grid().items.find(l => { const gi = angular.element(l).scope().gridsterItem; return gi.row === t.row && gi.col === t.col; });
@@ -76,7 +79,7 @@ jirav.block('dashboardLayout', 'dev', (jirav) => {
     const tx = r.left + dc * cw, ty = r.top + dr * rh;
     await show(Math.min(r.left, tx), Math.max(r.right, tx + r.width), Math.min(r.top, ty), Math.max(r.top, ty) + Math.min(r.height, 240));
     t = await find({ row: t.row, col: t.col });
-    const k = jirav.frame.width / innerWidth, to = { x: Math.round(t.grab.x + dc * cw * k), y: Math.round(t.grab.y + dr * rh * k) };
+    const k = jirav.frame.k(), to = { x: Math.round(t.grab.x + dc * cw * k), y: Math.round(t.grab.y + dr * rh * k) };
     const partial = t.col + dc !== col || t.row + dr !== row;
     return partial ? { from: t.grab, to, partial: true, next: `drag, then call moveTilePoints again with row ${row}, col ${col}` } : { from: t.grab, to };
   };

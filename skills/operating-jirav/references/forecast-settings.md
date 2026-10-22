@@ -35,15 +35,22 @@ doesn't show the per-account math.
 Which plans have it on: `listPlans()` → `autoForecast`.
 
 **A/R and A/P** (`/setup/forecast/arap`; read with `await jirav.getArApSettings()` →
-`{ar: {method, delay, account}, ap: {method, delay, account, accrualAccounts}}`, method `none`,
+`{ar: {method, delay, account, trailingMonths?}, ap: {method, delay, account, accrualAccounts, trailingMonths?}}`, method `none`,
 `trended` or `delayed`): A/R method **None / Trended percent of Revenue / Delayed
 days for collection**, the A/R account and A/R Delay (e.g. NET 30); A/P method **None / Trended
 percent of OpEx / Delayed days for Payment**, the A/P account, A/P Delay and A/P Accrual Accounts
 (chips).
 
-**None** = no A/R forecast: the receivable stays at its last actual balance and forecast revenue
-isn't collected into cash (verified on a plan copy: switching Delayed NET 0 → None left A/R flat
-and lowered cash by that amount). Switching None → Delayed asks for the account again (it's
+**None** = no A/R forecast: the receivable stays frozen at its last actual balance. Forecast revenue
+still turns into cash in the month it's earned; it's the opening balance that's never collected
+(verified on a plan copy: switching Delayed NET 0 → None left A/R flat at that balance and lowered
+cash by the same amount). A/P None likewise: bills are paid at once and the opening A/P is never paid. Switching None → Delayed asks for the account again (it's
 cleared). Settings → Forecast saves with SAVE in the bottom bar.
 
-Not yet tested: Trended (A/R / A/P).
+**Trended** (app source): the forecast A/R follows revenue at its recent ratio. Each forecast month
+collects the whole previous A/R balance (Decrease) and adds that month's revenue × the average of
+A/R ÷ revenue over the **Trailing Months** (3 by default; the average rolls forward from the last
+actual months) (Increase), so A/R ends each month at revenue × that ratio. A/P Trended works the
+same on OpEx and has no accrual accounts. Choosing Trended asks for the account again. After saving,
+the test plans showed no change within 5 minutes: re-read the System A/R / System A/P rows before
+relying on a new setting.

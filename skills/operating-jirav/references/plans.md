@@ -68,7 +68,8 @@ Facts for telling plans apart; which plan plays which role is the job skills' ca
     locked). So if the company's active PoR is its budget, a new PoR anywhere moves Current POR off
     the budget (to the new PoR if it's active, else to the auto-pick). One company makes each year's
     budget the PoR and archives the old ones as former PoRs.
-  - The PoR is whatever the company chose: often the budget, sometimes a forecast or a test plan.
+  - The PoR is whatever the company chose: usually this year's budget, changed once a year (former
+    PoRs are prior budgets); sometimes a forecast or a test plan, or none. A monthly PoR is rare.
 - **Budget imports** go into one plan each and don't mark it as a budget ([imports.md](imports.md)).
 - **The Auto-Forecast plan** ("Auto-Forecast", description "Jirav Intelligent Forecast") is created by
   the system; it can cut over at a fiscal-year start and often has the latest `updateTime`.
@@ -210,7 +211,8 @@ values. Right-clicking a cell gives Copy, Copy with Headers, Reset Columns and E
 
 ## Auto-Forecast
 
-**On / off is per plan.** Plan → Actions → **Enable / Disable Auto-Forecast** → toggle → SAVE. A
+**On / off is per plan.** Plan → Actions → **Enable / Disable Auto-Forecast** → toggle → SAVE (in a narrow pane
+the side panel is wider than the screen: take the toggle's point with `jirav.at`, which scrolls it in). A
 badge shows next to the plan name while it's on. Read it with
 `(await jirav.getAutoForecast(planId)).plan.enabled`. Turning it on in one plan doesn't change
 any other plan (verified on a copy).

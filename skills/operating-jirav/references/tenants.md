@@ -41,14 +41,9 @@ Wait for the title to end in `| <fullName> | Jirav`. Switching company is always
 load, so run the restore line (SKILL.md) afterwards. Lookups (`jirav.listPlans('company name')`, etc.)
 work for any company without switching.
 
-## Fallback: the company picker
+## Never the company picker
 
-Only if the API route fails. The picker at `app.jirav.com/-/public/#!#companies` is a
-**searchable text box**, not a `<select>`:
-
-- `form_input` doesn't work; list items are off-canvas until the box is focused.
-- Typing without clearing first inserts text into the current value.
-
-Steps: click the box → select all → delete → type part of the name → click the filtered row
-by its screen position → confirm the box shows the full name → click **Continue**.
-Continue writes to the clipboard — tell the user.
+Don't use the picker (`app.jirav.com/-/public/#!#companies`): in a narrow pane its Continue didn't
+navigate and the box switched to another company. Always go by URL. If `getTenant` can't find the
+company, show the names it did find and ask; if the lookup itself fails, ask the user to open the
+company in Jirav themselves, then read the page title (`| <fullName> | Jirav`).

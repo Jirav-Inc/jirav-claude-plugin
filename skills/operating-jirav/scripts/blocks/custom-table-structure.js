@@ -25,7 +25,7 @@ jirav.block('customTableStructure', 'dev', (jirav) => {
     const ids = Object.fromEntries((await jirav.listCustomTables()).map(t => [t.name, t.id]));
     return sidebarItems().map(it => {
       const name = clean(it.textContent), btn = it.querySelector('.dropdown-button-container');
-      return { name, id: ids[name] || null, active: it.classList.contains('m-active'), menu: btn ? jirav.at(btn) : null };
+      return { name, id: ids[name] || null, active: it.classList.contains('m-active'), menu: btn ? jirav.at(btn, { scroll: false }) : null };
     });
   };
   // The editor URL takes the name lowercased and triple URL-encoded; anything else silently opens the
@@ -58,7 +58,7 @@ jirav.block('customTableStructure', 'dev', (jirav) => {
 
   // One row per editor element, in screen order. A section's own item holds its header and, when it has
   // one, its Subtotal row (after the section's lines), so rows are read per element, not per item.
-  const describe = el => {
+  const describe = (el, scroll = false) => {   // listing all rows only reports; one row scrolls into view
     const item = el.closest('.muuri-item');
     const txt = el.innerText || '';
     const typeTxt = (txt.match(/ROW TYPE\s*\n\s*([^\n]+)/i) || [])[1] || (/Blank Row/i.test(txt) ? 'Blank Row' : '');
@@ -77,11 +77,11 @@ jirav.block('customTableStructure', 'dev', (jirav) => {
     }
     const btn = el.querySelector('.jv-action-menu-container button');
     // The "…" glyph sits left of and below the button's centre; clicks at the centre often miss.
-    const glyph = btn && (() => { const c = jirav.at(btn); return { x: c.x - 3, y: c.y + 2 }; })();
-    return { name, type, depth, section, moving: el.classList.contains('draggable'), menu: glyph || null, _item: item };
+    const glyph = btn && (() => { const c = jirav.at(btn, { scroll }); return c.offscreen || c.covered ? c : { x: c.x - 3, y: c.y + 2 }; })();
+    return { name, type, depth, section, moving: el.classList.contains('draggable'), menu: glyph || null, _item: item, _el: el };
   };
-  const allRows = () => { onPage(); return [...document.querySelectorAll('.movable-group-element')].filter(e => e.closest('.muuri-item') && e.closest('.movable-group-element-container')).map(describe); };
-  const strip = r => { const { _item, ...rest } = r; return rest; };
+  const allRows = () => { onPage(); return [...document.querySelectorAll('.movable-group-element')].filter(e => e.closest('.muuri-item') && e.closest('.movable-group-element-container')).map(el => describe(el)); };
+  const strip = r => { const { _item, _el, ...rest } = r; return rest; };
   const rows = () => allRows().map(strip);
   const find = name => {
     const hits = allRows().filter(r => r.name === name);
@@ -89,7 +89,7 @@ jirav.block('customTableStructure', 'dev', (jirav) => {
     if (hits.length > 1) throw new Error(`${hits.length} rows are named "${name}"; rename one first or pick by position from ct.rows().`);
     return hits[0];
   };
-  const row = name => strip(find(name));
+  const row = name => { const r = find(name); return strip({ ...r, menu: describe(r._el, true).menu }); };
   const moving = () => { const r = allRows().find(x => x.moving); return r ? r.name : null; };
   const pending = () => {
     const shown = b => { const r = b.getBoundingClientRect(); return r.height > 0 && r.top < innerHeight && getComputedStyle(b).visibility !== 'hidden'; };

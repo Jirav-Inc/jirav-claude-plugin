@@ -7,9 +7,10 @@ plan), then **say which plans you picked and why**, and ask when it isn't clear.
 
 ## Budget
 
-Not necessarily the plan of record: companies point it at a rolling forecast or a test plan as
-often as at a budget, and Jirav's own close guide makes each month's forecast snapshot the plan of
-record. A budget import doesn't mark a plan as the budget.
+Often, but not always, the plan of record: most companies make this year's budget the PoR and change
+it once a year (former PoRs are prior budgets); some point it at a forecast or a test plan, and
+some have none. Jirav's close guide offers making each month's snapshot the PoR, but companies rarely
+do (month-end-close → step 1). A budget import doesn't mark a plan as the budget.
 
 1. The plan the user names.
 2. Otherwise, candidates: plans whose `cutoverDate` is the first month of the fiscal year being

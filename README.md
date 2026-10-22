@@ -14,8 +14,26 @@ signed-in session.
 
 ## Install
 
-**Claude Cowork / Claude desktop:** Customize → Plugins → Add marketplace → enter
-`Jirav-Inc/jirav-claude-plugin`, then install **jirav**.
+**Claude Cowork / Claude desktop** (also as a [45-second video and illustrated
+guide](https://jirav-inc.github.io/jirav-claude-plugin/install-guide/)):
+
+1. Click **Customize** in the sidebar, then the **Plugins** tab.
+
+   <img src="https://jirav-inc.github.io/jirav-claude-plugin/install-guide/img/01-customize-plugins.png" width="560" alt="Customize, then Plugins">
+
+2. Click **+ Add** → **Add marketplace** → **Add from a repository**.
+
+   <img src="https://jirav-inc.github.io/jirav-claude-plugin/install-guide/img/02-add-marketplace.png" width="560" alt="Add, then Add marketplace">
+
+3. Paste `Jirav-Inc/jirav-claude-plugin`, click **Use "Jirav-Inc/jirav-claude-plugin"**, leave
+   **Sync automatically** on, and click **Sync**.
+
+   <img src="https://jirav-inc.github.io/jirav-claude-plugin/install-guide/img/05-sync.png" width="560" alt="The repository entered, Sync automatically on, Sync">
+
+4. **Jirav FP&A** appears under Plugins. Click **Add**, or **Try in chat** to install it and open a chat
+   that asks Claude what it can do.
+
+   <img src="https://jirav-inc.github.io/jirav-claude-plugin/install-guide/img/06-try-in-chat.png" width="560" alt="Jirav FP&A under Plugins, with Try in chat and Add">
 
 **Claude Code:**
 
@@ -47,6 +65,9 @@ Updates arrive when Jirav publishes a new version (each release is listed under 
 - **budget-import**: loads an annual budget from Excel into a plan through Jirav's Budget Import, by
   department. It keeps payroll from being counted twice when your staff roster already drives salaries,
   leaves Balance Sheet balances intact, asks before uploading and checks the result.
+- **cash-trace**: answers the cash questions a CEO asks: what happened to cash, where the forecast
+  says it's going (low point, burn, runway) and what it would take to stay above a cash goal, with
+  each lever sized. Read-only; every figure ties back to Jirav's cash.
 
 ## What this plugin runs and connects to
 

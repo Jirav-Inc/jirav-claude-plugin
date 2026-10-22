@@ -9,7 +9,7 @@
 // After a full page load (navigate, reload, switching company) the globals are gone. ONE line
 // restores the core and every block that was loaded in this tab:
 //
-//   location.host !== 'app.jirav.com' ? 'WAIT: on '+location.host+', not app.jirav.com yet: retry in a few seconds' : (typeof jirav !== 'undefined' && jirav.build === '7a85fc9b') ? jirav.status() : (localStorage.jiravKit || '').includes("KIT_BUILD='7a85fc9b'") ? (0, eval)(localStorage.jiravKit) : 'PASTE scripts/jirav.min.js (not cached in this browser, or out of date)'
+//   location.host !== 'app.jirav.com' ? 'WAIT: on '+location.host+', not app.jirav.com yet: retry in a few seconds' : (typeof jirav !== 'undefined' && jirav.build === 'b3d4d176') ? jirav.status() : (localStorage.jiravKit || '').includes("KIT_BUILD='b3d4d176'") ? (0, eval)(localStorage.jiravKit) : 'PASTE scripts/jirav.min.js (not cached in this browser, or out of date)'
 //
 // Blocks add page-specific helpers: one function mounted on jirav, or a namespace when there are several.
 // Paste a block file after the core when jirav.page() suggests it:
@@ -54,18 +54,18 @@
 //   jirav.getDataStatus()          {accounting: {source, company, connected, last…}, workforce, customTables, closeMonth, actualsFrom, actualsThrough}  where actuals come from, how fresh, which months hold them
 //   jirav.getPeriods(planId?)       {fiscalYearStartMonth, closeMonth, closeMonthSource: 'Specific Date'|'Accounting system', accountingCloseMonth, plan?: {actuals, forecast, editable}}
 //   jirav.getAutoForecast(planId?)  {company: {mode, method, departments, accountSettings}, plan?: {enabled}}
-//   jirav.getArApSettings()         {ar: {method, delay, account}, ap: {method, delay, account, accrualAccounts}}  Settings → Forecast → A/R and A/P
+//   jirav.getArApSettings()         {ar: {method, delay, account, trailingMonths?}, ap: {method, delay, account, accrualAccounts, trailingMonths?}}  Settings → Forecast → A/R and A/P
 //   jirav.getCompanySettings()      {general, accounting: {fiscalYearStart, currency, method, closeMonth, ...}, plans: {salaryExpenses, cash}, staffing, labels}  Settings → Company
 //   jirav.getSystemHealth()         [{severity, scope, plan, kind, message, driverId?}]  the ⚠ by the plan name; [] = no issues
 //   jirav.go(path) / jirav.ready()  in-app navigation that keeps the kit loaded; wait for load
 //   jirav.readTableRows(i?)        rows of a plain/Material table (Audit Log, Users) as {header: text}
-//   jirav.saveBar()                 {pending, blocked, reason?, covered, save:{x,y}, cancel:{x,y}}  the bottom SAVE CHANGES / Cancel bar; blocked: SAVE is disabled (reason = its tooltip), don't click; covered: an open panel hides it
+//   jirav.saveBar()                 {pending, blocked, reason?, covered, offscreen?, save:{x,y}, cancel:{x,y}}  the bottom SAVE CHANGES / Cancel bar; blocked: SAVE is disabled (reason = its tooltip), don't click; covered: an open panel hides it; offscreen: scroll first
 //   jirav.alerts({since})           [{kind: success|info|warning|error, text, at}]  every alert seen (success/info auto-close after 4 s)
 //   jirav.dismissAlerts()           close the alerts on screen (after reading warnings/errors); jirav.autoDismiss(false) to keep them
-//   jirav.waitIdle() / jirav.busy() wait out / detect the "Applying changes…" recalculation overlay (after every Save)
+//   jirav.waitIdle() / jirav.busy() wait out / detect the "Applying changes…" recalculation overlay and the closing save bar (after every Save)
 //   jirav.pageLinks()               plan/report sidebar links
 //   jirav.deepAll(root, selector)   querySelectorAll through shadow DOM
-//   jirav.at(el)                    click point of an element in screenshot coordinates {x, y}
+//   jirav.at(el)                    click point of an element in screenshot coordinates {x, y}: centre of its visible part, scrolled into view if needed; {offscreen:true, edge}, {covered:true} or {disabled:true}: don't click
 //   jirav.menu() / await jirav.menu.settled()   items of the open menu [{label, x, y}] ({offscreen} / {settling} flagged); settled() waits for the animation
 //   jirav.menu()                    items of the open menu/dropdown -> [{label, x, y}] (to click)
 //   jirav.drag(fromEl, toEl, {where:'before'|'after'})   drag-reorder within one list (see block docs)
@@ -512,9 +512,12 @@ var jirav = (() => {
   const getArApSettings = async (company) => {
     const [c, coa] = await Promise.all([api('/v1/arApForecastingConfiguration', company), getChartOfAccounts(company)]);
     const acct = id => { if (id == null) return null; for (const sec of coa) { const a = sec.accounts.find(x => String(x.key) === String(id)); if (a) return a.name; } return String(id); };
+    // Delayed names its account accountsReceivableAccount / accountsPayableAccount; Trended uses accountId
+    // and a trend (AVG_3_MONTHS…: trailing months).
     const one = (x, side) => !x ? null : { method: x['@type'] || null,
       delay: x[side === 'ar' ? 'accountsReceivableDelay' : 'accountsPayableDelay'] || null,
-      account: acct(x[side === 'ar' ? 'accountsReceivableAccount' : 'accountsPayableAccount']),
+      account: acct(x[side === 'ar' ? 'accountsReceivableAccount' : 'accountsPayableAccount'] ?? x.accountId),
+      ...(x.trend ? { trailingMonths: Number((String(x.trend).match(/\d+/) || [])[0]) || null } : {}),
       ...(side === 'ap' ? { accrualAccounts: (x.accountsPayableExpenseAccounts || []).map(acct) } : {}) };
     return { ar: one(c.accountsReceivableForecastingConfiguration, 'ar'), ap: one(c.accountsPayableForecastingConfiguration, 'ap') };
   };
@@ -537,6 +540,8 @@ var jirav = (() => {
     const t0 = Date.now(); let seen = false;
     await sleep(500);                                  // the overlay can take a moment to appear after Save
     while (Date.now() - t0 < timeoutMs) { const b = busy(); if (!b) break; seen = seen || b; await sleep(1000); }
+    // After a SAVE the bar slides out for a second or two, still reading pending: wait it out (≤ 3 s).
+    for (let i = 0; i < 6 && !busy(); i++) { if (!saveBar().pending) break; await sleep(500); }
     const waited = Date.now() - t0, still = busy();
     return still ? { busy: true, waitedMs: waited, note: 'still recalculating: wait again before clicking or verifying' } : { busy: false, waitedMs: waited, overlay: seen || null };
   };
@@ -559,9 +564,12 @@ var jirav = (() => {
     // the reason in data-tooltip, e.g. "Fill required cells or fix invalid rows".
     const off = n => n && (n.disabled || n.getAttribute('aria-disabled') === 'true');
     const holder = save.closest('[data-tooltip]');
-    const blocked = !!(off(save) || save.closest('[disabled]'));
-    return { pending: true, blocked, ...(blocked ? { reason: (holder && holder.getAttribute('data-tooltip')) || null } : {}),
-      covered, save: at(save), cancel: cancel ? at(cancel) : null };
+    const blocked = !!(off(save) || save.closest('[disabled]')), reason = blocked ? (holder && holder.getAttribute('data-tooltip')) || null : undefined;
+    // A dialog's own Save (Manage Plans) sits there disabled until something changes: nothing pending.
+    if (blocked && /no changes/i.test(reason || '')) return { pending: false, reason, cancel: cancel ? at(cancel) : null };
+    const sp = at(save);   // scrolls Save into view if needed; Cancel's point is only read, so it can't scroll Save away
+    return { pending: true, blocked, ...(blocked ? { reason } : {}), covered, ...(sp.offscreen ? { offscreen: true } : {}),
+      save: sp, cancel: cancel ? at(cancel, { scroll: false }) : null };
   };
   // Jirav's alerts (green/red boxes at the top) pile up. The kit logs every alert it sees, closes
   // success/info ones after 4 s, and leaves warnings/errors until read and dismissed.
@@ -654,8 +662,7 @@ var jirav = (() => {
   };
 
   // ── click helpers (read-only: they return coordinates, Claude clicks) ──
-  // Screenshot coordinates = CSS px × frame.width / innerWidth. The Browser pane's frame is 800 wide;
-  // if a screenshot reports another frame width, set jirav.frame.width to it.
+  // Screenshot coordinates = CSS px × frame.width / innerWidth (frame.width 800: Cowork's screenshot width).
   // Plain HTML / Material tables (Audit Log, Users, …): not ag-Grid, so readGridValues can't read them.
   const readTableRows = (index = 0) => {
     const tables = deepAll(document, 'table').filter(t => t.getBoundingClientRect().height > 0);
@@ -665,10 +672,50 @@ var jirav = (() => {
     const head = [...t.querySelectorAll('thead th, tr.mat-mdc-header-row th')].map(clean);
     return [...t.querySelectorAll('tbody tr')].map(r => { const c = [...r.querySelectorAll('td')].map(clean); return head.length ? Object.fromEntries(head.map((h, i) => [h || `col${i}`, c[i] ?? null])) : c; });
   };
-  const frame = { width: 800 };
-  const at = el => {
-    const r = el.getBoundingClientRect(), k = frame.width / innerWidth;
-    return { x: Math.round((r.x + r.width / 2) * k), y: Math.round((r.y + r.height / 2) * k) };
+  // Cowork's screenshot is always 800 wide, whatever the pane (measured 412-1600 CSS px: enlarged or
+  // shrunk), with height scaled by the same factor. Set jirav.frame.width for another browser tool.
+  const frame = { width: 800, k() {   // CSS px -> screenshot px
+    if (!innerWidth) throw new Error('The page is 0 px wide: the Browser pane has not been shown yet in this session. Ask the user to open it once (Cmd/Ctrl+Shift+B or the globe icon; it can be hidden again after), then call again.');
+    return this.width / innerWidth; } };
+  // Click point in screenshot coordinates: the centre of the part of the element that's really showing
+  // (inside the window, less its scrollbars, and inside every ancestor that clips), checked by asking
+  // what's on top there. Nothing showing (even after scrolling it into view) -> {offscreen: true, edge}; showing but under something else
+  // (a panel, a header that clips it) -> {covered: true}. Don't click either: scroll, close the panel,
+  // or collapse the plan sidebar, then call again.
+  const up = n => n.parentElement || (n.parentNode && n.parentNode.host) || null;
+  const within = (outer, n) => { for (; n; n = up(n)) if (n === outer) return true; return false; };
+  const hitAt = (x, y) => { let h = document.elementFromPoint(x, y); while (h && h.shadowRoot) { const d = h.shadowRoot.elementFromPoint(x, y); if (!d || d === h) break; h = d; } return h; };
+  // An icon inside a button: the point can land on a sibling inside the same button (its touch target),
+  // which is still a click on that button.
+  const control = n => { for (; n; n = up(n)) if (/^(BUTTON|A)$/.test(n.tagName) || (n.getAttribute && n.getAttribute('role') === 'button')) return n; return null; };
+  const sameControl = (el, h) => { const c = control(el); return !!c && c === control(h); };
+  const at = (el, opts = {}) => {
+    const r = el.getBoundingClientRect(), k = frame.k(), de = document.documentElement;
+    let x0 = Math.max(r.left, 0), x1 = Math.min(r.right, de.clientWidth || innerWidth), y0 = Math.max(r.top, 0), y1 = Math.min(r.bottom, de.clientHeight || innerHeight);
+    for (let n = up(el); n && n !== de && n !== document.body; n = up(n)) {
+      const cs = getComputedStyle(n); if (cs.overflowX === 'visible' && cs.overflowY === 'visible') continue;
+      const q = n.getBoundingClientRect();
+      if (cs.overflowX !== 'visible') { x0 = Math.max(x0, q.left); x1 = Math.min(x1, q.left + n.clientLeft + n.clientWidth); }
+      if (cs.overflowY !== 'visible') { y0 = Math.max(y0, q.top); y1 = Math.min(y1, q.top + n.clientTop + n.clientHeight); }
+    }
+    const cx = r.x + r.width / 2, cy = r.y + r.height / 2, pt = (x, y) => ({ x: Math.round(x * k), y: Math.round(y * k) });
+    if (x1 - x0 < 2 || y1 - y0 < 2) {
+      // Off screen inside something that scrolls (a wide dialog's table, a long page): scroll it in
+      // (view only) and measure again, once. {scroll: false} to only report.
+      if (opts.scroll !== false) { el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' }); return at(el, { scroll: false }); }
+      const edge = r.left >= x1 || cx > innerWidth ? 'right' : r.right <= x0 || cx < 0 ? 'left' : r.top >= y1 || cy > innerHeight ? 'below' : 'above';
+      return { ...pt(cx, cy), offscreen: true, edge };
+    }
+    // The visible part's centre first, then a few points around it (a label or icon can sit on top).
+    const mx = (x0 + x1) / 2, my = (y0 + y1) / 2, dx = (x1 - x0) / 4, dy = (y1 - y0) / 4;
+    for (const [x, y] of [[mx, my], [mx - dx, my], [mx + dx, my], [mx, my - dy], [mx, my + dy]]) {
+      const h = hitAt(x, y);
+      if (h && (within(el, h) || (within(h, el) && /^(BUTTON|A|LI|LABEL|INPUT|SELECT|TEXTAREA)$/.test(h.tagName)) || sameControl(el, h))) return pt(x, y);
+    }
+    // A disabled control lets the pointer through to what's behind it: say disabled, not covered.
+    const off = el.closest('button, input, select, textarea, [role=button]');
+    if (off && (off.disabled || off.getAttribute('aria-disabled') === 'true' || getComputedStyle(off).pointerEvents === 'none')) return { ...pt(mx, my), disabled: true };
+    return { ...pt(mx, my), covered: true };
   };
   const visible = el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
   // Material icon ligatures ("more_vert", "remove_circle_outline") show up as text: strip words with
@@ -722,7 +769,7 @@ var jirav = (() => {
         }
       }
       if (!onTop(e, r)) continue;                       // covered, or a closed menu left behind
-      const p = at(e);
+      const p = at(e, { scroll: false });
       if (seen.has(label + p.y)) continue; seen.add(label + p.y);
       out.push(moving(e) ? { label, ...p, settling: true } : { label, ...p });
     }

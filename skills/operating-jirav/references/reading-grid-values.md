@@ -60,7 +60,8 @@ blank and the row would vanish). With several grids on one page the result is an
   - `grains`: month, quarter, year, or range. FY and total columns are **not** months; don't
     add them to monthly sums.
   - `kinds`: `actual` or `forecast` per month column, on plan and report pages. It's `null` for
-    FY, range and total columns. On report pages: `variance` (Δ), `variancePercent` (% next to a
+    FY, range and total columns, and for every column on the Staffing grids (tell actual from forecast
+    there by the plan's cutover, `getPeriods(planId)`). On report pages: `variance` (Δ), `variancePercent` (% next to a
     Δ, a fraction: −0.11 = −11%) and `percentOf` ("% of Revenue" columns). These carry the same
     `period` as the value columns beside them, and `{kind: 'actual'|'forecast'}` leaves them out.
   - `departments`: appears when columns are departments (e.g. "Income Statement by Dept").
@@ -68,6 +69,8 @@ blank and the row would vanish). With several grids on one page the result is an
   - `sources`: the plan(s) or scenario(s) the numbers come from. When columns come from
     different sources (e.g. BvA pages: Actuals vs Budget, with the same column label twice),
     `columnSources` gives the source for each column. Columns without a source (Δ, %) are `null`.
+    `kinds` says actual or forecast *within* that source: a plan column for a month before the
+    plan's cutover holds actuals, so it's `actual` too. Tell Actuals from the plan by `columnSources`.
 - **Row kinds (`kind`)**
   - Plan pages:
     - `account`: a leaf account. Editable per department.

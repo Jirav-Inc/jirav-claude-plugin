@@ -36,7 +36,6 @@ jirav.block('readGridValues', 'dev', (jirav) => {
       // Some grids (staffing) start with a ⋯ row-menu column: the labels are in the next one.
       const cols = capi.getAllDisplayedColumns().filter(c => c.getColId() !== 'rowMenu');
       const header = col => capi.getDisplayNameForColumn(col, 'header');
-      const groupDef = col => { const p = col.getParent && col.getParent(); return p && (p.getColGroupDef ? p.getColGroupDef() : p.getOriginalColumnGroup && p.getOriginalColumnGroup().getColGroupDef()); };
       const labelCol = cols[0];
 
       const describe = col => {
@@ -49,7 +48,14 @@ jirav.block('readGridValues', 'dev', (jirav) => {
         if (!start && gid && MON[gid[1].toLowerCase()]) start = end = `${gid[2]}-${String(MON[gid[1].toLowerCase()]).padStart(2, '0')}`;
         if (!start) { const lb = String(header(col)).match(/^([A-Za-z]{3})-(\d{2})$/); if (lb && MON[lb[1].toLowerCase()] && (tags.includes('PERIODIC') || m.columnHeaderLevelType === 'PERIOD')) start = end = `20${lb[2]}-${String(MON[lb[1].toLowerCase()]).padStart(2, '0')}`; }
         if (!start) return null;                       // not a value column (label/attribute)
-        const gd = groupDef(col), gm = (gd && gd.metadata) || {};
+        // The source (Actuals / a plan) is whichever header level is SOURCE: usually the group above the
+        // period columns, but in a trended report it's the column under a month group ("Oct-26").
+        let gd = null, gm = {};
+        if (m.columnHeaderLevelType === 'SOURCE' || m.srcId) { gd = { headerName: m.shortName || header(col) }; gm = m; }
+        else for (let p = col.getParent && col.getParent(); p; p = p.getParent && p.getParent()) {
+          const d = p.getColGroupDef ? p.getColGroupDef() : p.getOriginalColumnGroup && p.getOriginalColumnGroup().getColGroupDef(), dm = (d && d.metadata) || {};
+          if (dm.columnHeaderLevelType === 'SOURCE' || dm.srcId) { gd = d; gm = dm; break; }
+        }
         const grain = /yearly/i.test(id) ? 'year' : /quarterly/i.test(id) ? 'quarter' : (start === end ? 'month' : 'range');
         const fi = m.forecastIndicator !== undefined ? m.forecastIndicator : gm.forecastIndicator;
         // Report Δ / % columns and "% of" columns carry periods too: type them so {kind} filters skip them.
@@ -58,7 +64,7 @@ jirav.block('readGridValues', 'dev', (jirav) => {
           : tags.includes('forecast') ? 'forecast' : (tags.includes('actuals') || tags.includes('actual')) ? 'actual'
           : (grain === 'month' && typeof fi === 'boolean') ? (fi ? 'forecast' : 'actual') : null;
         return { col, label: header(col), period: start === end ? start : `${start}..${end}`, range: [start, end], grain, kind,
-          department: pr.DEP_NAME || null, total: pr.TOTAL_COLUMN === 'true', source: gm.srcId || null, sourceName: gd ? gd.headerName || gm.shortName || null : null };
+          department: pr.DEP_NAME || null, total: pr.TOTAL_COLUMN === 'true', source: gm.srcId || null, sourceName: gd ? gm.shortName || gd.headerName || null : null };
       };
 
       const described = cols.slice(1).map(col => ({ col, d: describe(col) }));
@@ -85,7 +91,7 @@ jirav.block('readGridValues', 'dev', (jirav) => {
       let anyAllowed = false; api.forEachNode(n => { if (!anyAllowed && tagsOf(n).some(x => /_DRIVER_ALLOWED$/.test(x))) anyAllowed = true; });
       const isPlanGrid = (() => { let r = false; api.forEachNode(n => { if (!r && n.data && n.data.metadata && !n.data.rowMeta) r = true; }); return r; })();
       const inferred = isPlanGrid && !anyAllowed;
-      const SUBLINES = /^(System Salaries|Manual Input)$/;
+      const SUBLINES = /^(System Salaries|Manual Input|Auto-Forecast)$/;   // per-account lines, never accounts
       const onCustomTable = /\/custom\//.test(location.pathname);
       let aggDept = 'All';
       if (deptCol) { let found = false; api.forEachNode(n => { if (!found && n.level === 0) { const v = unwrap(api.getValue(deptCol, n)); if (v != null && v !== '') { aggDept = String(v); found = true; } } }); }
@@ -140,7 +146,7 @@ jirav.block('readGridValues', 'dev', (jirav) => {
         if (o.skipHeaders && kind === 'header') return;
         if (wantKinds && !wantKinds.includes(kind)) return;
         const vals = vcols.map(v => num(unwrap(api.getValue(v.col, n))));
-        if (o.skipEmpty && vals.every(v => v == null)) return;
+        if (o.skipEmpty && vals.length && vals.every(v => v == null)) return;   // a grid with no period columns (Manage Staff) keeps its rows
         const type = st ? st.name + (st.format ? ':' + st.format : '') : (nm.dataType || null);
         const attrs = attrCols.length ? Object.fromEntries(attrCols.map(ac => [header(ac), unwrap(api.getValue(ac, n))])) : null;
         const row = { label, depth: n.level, kind, type, attrs, values: vals };
@@ -211,9 +217,9 @@ jirav.block('readGridValues', 'dev', (jirav) => {
     const n = hits[opts.index || 0];
     for (let p = n.parent; p && p.level >= 0; p = p.parent) if (p.setExpanded && !p.expanded) p.setExpanded(true);
     await new Promise(r => setTimeout(r, 300));
-    // Narrow panes (Cowork ~800 px): if the scrolling area can't show the month column, make room,
-    // view-only (nothing saved; a reload restores it): collapse Jirav's left sidebar, then narrow the
-    // pinned columns. Never ask the user to resize.
+    // Narrow panes (Cowork's run ~400-1000 px): if the scrolling area can't show the month column, make
+    // room, view-only (nothing saved; a reload restores it): collapse Jirav's left sidebar, narrow the
+    // pinned columns, and as a last resort unpin them. Never ask the user to resize.
     const room = () => { const v = root.querySelector('.ag-center-cols-viewport'), w = root.getBoundingClientRect(); if (!v) return 0;
       const r = v.getBoundingClientRect(); return Math.max(0, Math.min(r.right, w.right, innerWidth) - Math.max(r.left, w.left, 0)); };
     const need = Math.min(col.getActualWidth(), 120) + 8;
@@ -233,7 +239,15 @@ jirav.block('readGridValues', 'dev', (jirav) => {
         if (cut > 0) { setW(pc, pc.getActualWidth() - cut); short -= cut; }
         if (short <= 0) break;
       }
-      await new Promise(r => setTimeout(r, 400)); restore();
+      await new Promise(r => setTimeout(r, 400));
+      // Still no room (a ~400 px pane: the pinned columns' minimum widths fill the grid): unpin them for
+      // this view, so they scroll away and the month can be scrolled in. A reload pins them again.
+      if (room() < need) {
+        const pin = (cl, v) => capi.setColumnsPinned ? capi.setColumnsPinned([cl], v) : capi.setColumnPinned ? capi.setColumnPinned(cl, v) : api.setColumnsPinned([cl], v);
+        for (const pc of cols.filter(cl => cl.getPinned && cl.getPinned())) pin(pc, null);
+        await new Promise(r => setTimeout(r, 400));
+      }
+      restore();
     }
     api.ensureNodeVisible(n, 'middle'); (api.ensureColumnVisible || capi.ensureColumnVisible).call(api.ensureColumnVisible ? api : capi, col);
     await new Promise(r => setTimeout(r, 500));
@@ -241,16 +255,19 @@ jirav.block('readGridValues', 'dev', (jirav) => {
     if (!el) throw new Error('The cell did not render: scroll the grid into view and call again.');
     // Click the middle of the part of the cell that's really showing: inside the scrolling area (pinned
     // columns can cover it in a narrow pane) and inside the window. Too little showing -> offscreen.
+    // A report grid is as tall as its rows and the page scrolls instead: bring the row into the window first.
+    if (el.getBoundingClientRect().bottom > innerHeight || el.getBoundingClientRect().top < 0) { el.scrollIntoView({ block: 'center', inline: 'nearest' }); await new Promise(r => setTimeout(r, 300)); }
     const r = el.getBoundingClientRect(), vp = el.closest('.ag-center-cols-viewport, .ag-center-cols-clipper, .ag-pinned-left-cols-container, .ag-pinned-right-cols-container') || el;
     const v = vp.getBoundingClientRect();
     const x0 = Math.max(r.left, v.left, 0), x1 = Math.min(r.right, v.right, innerWidth), y0 = Math.max(r.top, 0), y1 = Math.min(r.bottom, innerHeight);
     const value = unwrap(api.getValue(col, n));
-    if (x1 - x0 < 12 || y1 - y0 < 8) return { offscreen: true, value, reason: `only ${Math.max(0, Math.round(x1 - x0))} px of the cell can show, even with the sidebar collapsed and the pinned columns narrowed: close any open panel and call again` };
+    if (y1 - y0 < 8) return { offscreen: true, value, reason: `the row is ${r.top < 0 ? 'above' : 'below'} the window even after scrolling: scroll the page to it and call again` };
+    if (x1 - x0 < 12) return { offscreen: true, value, reason: `only ${Math.max(0, Math.round(x1 - x0))} px of the cell can show, even with the sidebar collapsed and the pinned columns narrowed: close any open panel and call again` };
     const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
     let hit = document.elementFromPoint(cx, cy);                    // the grid can sit in shadow DOM: drill down
     while (hit && hit.shadowRoot) { const d = hit.shadowRoot.elementFromPoint(cx, cy); if (!d || d === hit) break; hit = d; }
     if (!hit || !(hit === el || el.contains(hit))) return { offscreen: true, value, reason: 'something covers the cell (a panel or the save bar): close it and call again' };
-    const k = jirav.frame.width / innerWidth;
+    const k = jirav.frame.k();
     return { x: Math.round(cx * k), y: Math.round(cy * k), value };
   };
 

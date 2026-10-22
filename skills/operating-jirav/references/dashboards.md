@@ -40,7 +40,7 @@ comes back as plain text in `listDashboardTiles(...).text` and `getTileValues` â
 
 **Edit Tile** (full-screen editor; **SAVE** / **CANCEL** top right): Tile Name; type (Vertical
 Bar, Line, Horizontal Bar, Number, Table, Stacked Vertical Bar, Donut); Tile Data: Primary Source
-(Actuals, each active plan, Current PoR, and **Goals**: unlike report columns, tiles can show goals),
+(Actuals, each active plan, Current PoR, and **Goals**: unlike report columns, tiles can show goals; when you add or change a tile, use the named plan, not Current PoR, unless the user asks for it by name),
 Comparison Source, Selection Type (Data Series / Dimensions), data series list (â‹® per series,
 **ADD DATA SERIES**); Overlay line; Time: Date Range (company ranges), Show Dates, Show Actuals
 Until; Data Display options. The preview's **Data** tab shows the tile's numbers as a table.

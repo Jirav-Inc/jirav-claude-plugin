@@ -43,6 +43,9 @@ last arrived, and the close month. The page's **Status** box shows the same.
 ## Don't, without the user
 
 - **Connect / Disconnect** a system: it starts a sign-in (OAuth) in another product. The user does it.
+- **Import** on a connected system's card pulls the latest trial balances (automatic imports cover the
+  last two months; QuickBooks Desktop imports only on demand, from the user's PC). The user presses it, or
+  Claude after a yes; re-read `getDataStatus()` afterwards. Adding a month: [excel-actuals.md](excel-actuals.md).
 - **Import** a file (budgets, staff list, custom-table actuals): see [imports.md](imports.md).
 
 How often a connected accounting system syncs is set in [company-settings.md](company-settings.md)

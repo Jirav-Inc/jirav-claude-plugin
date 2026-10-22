@@ -12,7 +12,7 @@ LIVE package changes it for everyone who opens it. Reports only *display* data f
 |---|---|
 | Package | A named set of pages (the "report"). `status`: `LIVE` (updates as data changes), `PUBLISHED` (frozen snapshot), `SYSTEM` (built-in "All Reports", read-only). Max 50 packages. |
 | Page | One report in a package. `type`: `reportWithSources` (grid), `text`, `cover`, `index`, `dashboard`. `template` (e.g. `incomeStatement`, `balanceSheet`) is the page kind it was created from. |
-| Source | Where a page's numbers come from: `jirav.listReportSources()`. **Current PoR** (`id: 'por:Current POR'`) follows whichever plan is the plan of record; its `pointsTo` is that plan's `shortName`. Another `PLAN_OF_RECORD` entry, the plan's own row, has the plan's description in `pointsTo`: don't use it. |
+| Source | Where a page's numbers come from: `jirav.listReportSources()`. **Current PoR** (`id: 'por:Current POR'`) follows whichever plan is the plan of record; its `pointsTo` is that plan's `shortName`. Another `PLAN_OF_RECORD` entry, the plan's own row, has the plan's description in `pointsTo`: don't use it. When you add or change a column, use the named plan (e.g. `2026 Budget`), not Current PoR, unless the user asks for Current PoR by name: Current PoR moves whenever the PoR changes. |
 | Column group | A page's columns: primary source + date range, optional comparison source(s) and variance #/%. |
 
 ## Find and read

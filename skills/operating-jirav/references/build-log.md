@@ -33,7 +33,8 @@ the user answers both at once:
 - Never pick a folder yourself. If a connected folder already has a `jirav/` log folder, you may
   offer it: "Keep using the log in `<folder>/jirav`?"
 - The folder must be connected to this session. If the one they name isn't, request access to it.
-- If they decline, or no folder can be reached, write the same CSV (same name and format) in this
+- If they decline, or no folder can be reached, and the calling skill doesn't say otherwise
+  (month-end-close: a "no log" answer means no file and no table), write the same CSV (same name and format) in this
   session's outputs, give it to the user as a file at the end, and add a short table of the rows
   in the final message. Don't ask again.
 - On the first write, say the file's full path and that it contains their financial values.

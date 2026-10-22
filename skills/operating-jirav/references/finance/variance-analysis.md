@@ -28,8 +28,9 @@ lines, custom lines), each `favorable`: POSITIVE, NEGATIVE or IGNORE.
 
 - If the line's rule has a threshold (`valueThreshold`, `percentThreshold`, combined by `match`
   OR / AND), a variance is material when it passes it.
-- Most companies set none (0 on the P&L lines). Then don't call
-  anything "material": rank by absolute amount, report the largest, and say no threshold is set.
+- Most companies set none (0 on the P&L lines). With no non-zero threshold returned, don't call
+  anything "material": rank by absolute amount, report the largest, and write exactly
+  `No threshold returned; ranked by |Δ|.` (never "no threshold is set").
   Use the user's threshold if they give one.
 - Join plans by account label; an account missing from one plan counts as 0 there. Spend with no
   budget line and budget lines with no spend are worth listing.

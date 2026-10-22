@@ -14,9 +14,10 @@ through menus, unless a reference says otherwise.
 - **No browser, no Jirav.** Every task here runs in a browser on app.jirav.com. If you can't control a
   browser in this session, say so before starting, and suggest Claude Cowork (built-in browser) or Claude
   with the Claude in Chrome extension.
-- **The user signs in.** Never type credentials. On `signin.jirav.com` (or after a 401/403 from the
-  kit), ask the user to sign in in the browser pane. An "OAuth Error" page usually clears if you
-  navigate again.
+- **The user signs in.** Never type credentials. If the browser has no tab, or none on Jirav, open
+  `https://app.jirav.com` yourself first. On `signin.jirav.com` (or after a 401/403 from the kit), ask
+  the user to sign in in the browser pane; if the sign-in times out ("session ended… try again"), ask
+  them to sign in again. An "OAuth Error" page usually clears if you navigate again.
 - **Find via the API, read values from the page, write through the UI.** Never compute financial
   values from raw API payloads, and never call write endpoints. Totalling values read from the page
   or an export (months into quarters, say) is fine: say you did it.
@@ -40,20 +41,30 @@ They don't save: you click, type and Save at the coordinates they return (`jirav
 - **Start every browser call with the restore line.** It reloads the kit cached in this browser
   (across reloads, tabs and sessions) while the files here are unchanged:
   ```js
-  location.host !== 'app.jirav.com' ? 'WAIT: on '+location.host+', not app.jirav.com yet: retry in a few seconds' : (typeof jirav !== 'undefined' && jirav.build === '7a85fc9b') ? jirav.status() : (localStorage.jiravKit || '').includes("KIT_BUILD='7a85fc9b'") ? (0, eval)(localStorage.jiravKit) : 'PASTE scripts/jirav.min.js (not cached in this browser, or out of date)'
+  location.host !== 'app.jirav.com' ? 'WAIT: on '+location.host+', not app.jirav.com yet: retry in a few seconds' : (typeof jirav !== 'undefined' && jirav.build === 'b3d4d176') ? jirav.status() : (localStorage.jiravKit || '').includes("KIT_BUILD='b3d4d176'") ? (0, eval)(localStorage.jiravKit) : 'PASTE scripts/jirav.min.js (not cached in this browser, or out of date)'
   ```
 - **PASTE**: paste the whole of `scripts/jirav.min.js` with `javascript_tool` on any app.jirav.com page (even
-  the company picker). `scripts/jirav.js` is the readable, documented source: read it, don't paste it.
+  the company picker). Needed once per browser and again after a plugin update: the browser keeps it
+  across conversations (Cowork included). `scripts/jirav.js` is the readable, documented source: read it, don't paste it.
 - **Blocks**: paste `scripts/blocks/<name>.min.js` after the core when `jirav.page().hint` or a
   reference asks; the restore line brings them back afterwards. `grid-values` (`readGridValues`),
   `custom-table-structure`, `dashboard-layout`, `exports` (no save prompt), `imports` (no file chooser).
 - A documented function is missing: paste the core, then the block.
 - **Menus:** after opening one, read it with `await jirav.menu.settled()`: it waits for the opening
-  animation, and returns only the menu that's really open.
-- **Narrow panes** (Cowork's is ~800 px): the helpers make room themselves, view-only. `cellPoint`
-  collapses Jirav's left sidebar and narrows pinned columns (the user's saved widths are kept); the
+  animation, and returns only the menu that's really open. A ▸ item opens its submenu on **hover**
+  (move the pointer onto it, then read the menu again); clicking it closes the submenu. Escape doesn't
+  close the header menus (Actions, Share): click an empty part of the page.
+- **Narrow panes** (Cowork's runs about 400–1000 px wide): the helpers make room themselves, view-only. `cellPoint`
+  collapses Jirav's left sidebar, narrows pinned columns and, in a ~400 px pane, unpins them (all
+  view-only: the user's saved widths are kept, a reload restores the view); the
   dashboard helpers scroll and move in steps (`partial`). **Never ask the user to resize the pane.**
   A result with `offscreen: true` gives no point: follow its `reason` (scroll, close a panel), retry.
+  `jirav.at(el)` scrolls an element into view itself (a wide dialog or side panel scrolls sideways)
+  and aims at the part that shows. It flags `offscreen` (+ `edge`), `covered` (a panel on top:
+  close it) or `disabled`: don't click those. Scrolling moves other points: take each point just
+  before its click.
+  Kit points are in screenshot coordinates (the screenshot is always 800 wide; its height follows the pane).
+  If the screenshot tool ever reports another width, set `jirav.frame.width` to it.
 
 ## Where to look
 
@@ -73,7 +84,7 @@ Facts marked *(help)* come from Jirav's help articles and haven't been tested: c
 | Dashboards and tiles, moving / resizing tiles | `dashboards.md` |
 | Export to Excel / PDF / CSV without a save prompt | `exports.md` |
 | Import from Excel: budgets, staff list, custom-table actuals | `imports.md` |
-| GL actuals from Excel (companies on JiravExcel) | `excel-actuals.md` |
+| Adding a month of GL actuals ("add October"), any source; GL actuals from Excel (JiravExcel) | `excel-actuals.md` (checks the source and `actualsThrough` first) |
 | Where actuals come from, last sync, close month | `integrations.md` |
 | Settings: company (close month, fiscal year, labels) / goals / variance rules and cash flow / users, roles, Audit Log | `company-settings.md` / `goals.md` / `variance-and-cash-flow-settings.md` / `users-and-audit-log.md` |
 | Chart of Accounts / Departments / Date ranges / Auto-Forecast method | `chart-of-accounts.md` / `departments.md` / `date-ranges.md` / `forecast-settings.md` |
@@ -130,9 +141,11 @@ Mistakes change a customer's financial model. For every change:
 
 - Filter grid reads (`under`, `match`, `maxDepth`, `from`/`to`, `kind`): a full plan page is ~50 KB.
 - Report values with period, plan or report, department, and actual vs forecast.
-- Screenshots are small (≈800×500) and much of the app isn't in the accessibility tree: use kit
-  coordinates or the latest screenshot. After any reload or navigation, take points again: a
-  reload re-opens a collapsed sidebar, so earlier points are off.
+- Screenshots are 800 px wide (height varies with the pane) and much of the app isn't in the
+  accessibility tree: use kit coordinates. If a tall screenshot is shown to you shrunk ("multiply by
+  1.24"), kit points stay right, but multiply points you read off the image by that factor.
+  Take points again after any reload or navigation (a reload re-opens a collapsed sidebar), and
+  after the Browser pane is shown, hidden or resized (its size changes). Hidden still works.
 - Leave the browser tidy: reset filters you changed and say which page the tab is on.
 - Flag anomalies (sign flips, outliers, a report sourcing a deleted plan, a plan name that
   contradicts its cutover). Report them; don't "fix" them.

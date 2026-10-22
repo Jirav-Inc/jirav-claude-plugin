@@ -83,7 +83,9 @@ you pick an item.
   section clones its lines too. Tables have no Clone (their ⋮ has Rename, Delete, Move Up / Down).
 - **Copy to Table** (section only) → pick another table → Select. The section and its lines are
   copied there **immediately** as a new section with new IDs, so values don't carry over.
-- **Add Subtotal** adds a Subtotal row after the section (the section's `subtotal: true`).
+- **Add Subtotal** adds a Subtotal row after the section (the section's `subtotal: true`). It's named
+  "Subtotal <section name>" and can't be renamed, so name the section for what the total is ("Net New
+  MRR", not "MRR lines").
 - **Delete** on a saved row asks "Delete Custom Line… permanently remove it… Plans referencing
   this custom line will be affected". That deletes the line's values **in every plan**. Deleting
   a section also deletes all its lines, even though the dialog doesn't say so. Get an explicit
