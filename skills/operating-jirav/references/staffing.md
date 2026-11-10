@@ -26,31 +26,70 @@ The page `/<tenant>/plan/x/<planId>/staffing` has four grids, readable with
 | 2 | **Manage Staff** | one row per person: Department, Role, Full Name, Hire Date, Annual Wages, Term Date |
 | 3 | **Driver Based Hires** | one row per staffing driver (settings, no monthly values) |
 
+`match` finds department rows too: `readGridValues({grid: 1, match: 'General and Administrative', maxDepth: 1})` is
+that department's salaries by month. Read just after the page opens, the grids can still be empty (no rows, and a
+warning that the grid has no period columns): `await jirav.waitIdle()` and read again.
+
 Salaries flow to OpEx as **System Salaries** lines under *Salaries and Wages*: one per department
 plus an *All* total. Don't add the total to the department lines. They're read-only on OpEx.
 
 ## Change
 
-All in Manage Staff / Driver Based Hires. **Manage Staff edits are batched: nothing is stored
-until SAVE CHANGES** at the bottom (Cancel discards).
+On the plan's Staffing page, use `jirav.driverGrids`
+(`(await jirav.page()).blocks` says so). Each change is one call through the page's own controls, read back from the grid:
 
-| Change | How |
-|---|---|
-| Add a planned hire | **Add Planned Hire** (or row ⋯ → Add / Clone Planned Hire). A new row "TBH" appears at the bottom of the grid: double-click Department (list), select Role and press Enter (list of existing roles; it also takes free text, so reuse an existing role unless asked), double-click Hire Date and type `YYYY-MM-DD` + Enter, double-click Annual Wages, type the **full number** (`90000`: "90k" is stored as 90, silently), Enter. Full Name can stay "TBH". SAVE CHANGES |
-| Raise | Row ⋯ → **Plan Raise**: date, then $ per year **or** % of base salary → Add → Save in the dialog → **SAVE CHANGES** on the page. Works on imported staff too, and stays in this plan (verified: a 10% raise on an imported 125,000 salary added 1,041.67 a month in the copy; the original plan had no raise). To remove one: row ⋯ → Plan Raise → Remove → Yes → Save → SAVE CHANGES |
-| End someone's employment | Double-click **Term Date** (any row), type the date, Enter, SAVE CHANGES |
-| Delete a planned hire | Row ⋯ → Delete Planned Hire, SAVE CHANGES. Imported staff can't be deleted or have their name, role, hire date or wages edited |
-| Driver-based hires | **Add Driver** adds a row: Department, Role, Annual Wages, **Driver** ([variable picker](variable-picker.md)), **Rate**, Round, Div/0, Freq, Start, End. Driver fx Rate (× by default) is the **total headcount needed** for that department and role, rounded to whole people per Round: hires = needed − existing employees, never below 0 (3 people + target 5 → 2 hires). If the need falls later, the driver's own hires are removed and counted as terminations; existing employees are never cut (app source). Salaries flow to the department; driver hires aren't in `listStaff()`. **Saved as soon as the required fields are filled** ("New driver created"), not via SAVE CHANGES. Listed by `jirav.listPlanDrivers(planId)` as type `staffing`. Example *(help)*: 1 CSM per $1M ARR = ARR × 0.000001, Round up |
+```js
+const G = jirav.driverGrids;
+// Manage Staff (sys:employee): nothing is stored until SAVE CHANGES
+await G.add('sys:employee', { name: 'Jane Doe' })     // Add Planned Hire: a row at the bottom, its Full Name typed
+await G.set('sys:employee', 'Jane Doe', { 'cus:depId': 'General and Administrative', 'cus:roleName': 'Support',
+  'cus:hireDate': '2026-03-01', 'cus:annualWages': 90000 })   // -> {done, failed, missing, waitsForSaveChanges}
+await G.set('sys:employee', 'Sam Lee', { 'cus:termDate': '2026-06-30' })   // '' clears it
+await G.raise('Alex Kim', { percent: 5, date: '2026-07-01' })              // or {perYear: 3000} / {perMonth: 250}
+                                                      // -> raises as {date, value, type} (listStaff names the date `from`)
+await G.removeRaise('Alex Kim', '2026-07-01')
+await G.remove('sys:employee', 'Jane Doe')            // Delete Planned Hire (imported staff can't be deleted)
+await (await jirav.saveBar()).press()                         // SAVE CHANGES, after the user's yes; .discard() drops them all
+// Driver Based Hires (staffing): saved by Jirav as soon as its required cells are filled ("New driver created")
+await G.add('staffing', { name: 'Support per revenue' })
+await G.set('staffing', 'Support per revenue', { deptId: 'General and Administrative', role: 'Support', annualWages: 60000,
+  operand1: ['Revenue'], operator: '*', operand2: 0.000001, roundingMode: 'Round Up' })
+await G.remove('staffing', 'Support per revenue')     // -> {asked: 'Delete Driver'}: after the user's yes, click its Yes
+await jirav.click({ label: 'Yes', where: 'dialog: Delete Driver' })   // no success message: check listPlanDrivers
+```
 
-To scroll the Manage Staff grid to a row, the grid's API works where mouse scrolling doesn't:
-`api.ensureIndexVisible(i)` on grid 2 (see reading-grid-values.md for getting the grid).
+- **Columns:** Department (as listed), Role (Manage Staff: a role in use is reused when the name matches exactly; otherwise
+  the text becomes a new role: reuse an existing one unless asked. Driver Based Hires: only the saved staff's roles; one
+  not offered fails, the error lists those that are, and nothing more is set on the new row, so ask the user which), Full Name ("TBH" by default), Hire Date and Term Date
+  (`YYYY-MM-DD`), Annual Wages (the full number: 90000, never "90k").
+- **Imported staff:** only Term Date (when the import gave none) and raises change; the rest is the import's.
+- **Raises** stay in this plan and work on imported staff too (verified: a 10% raise on an imported 125,000 salary
+  added 1,041.67 a month in a copy; the original plan had no raise). One raise per month; a raise's date is no earlier
+  than the cutover and the hire date. Left out, the date is the dialog's own (that earliest month).
+- **Pending staff changes lock Driver Based Hires** (its Add Driver is disabled): SAVE CHANGES or discard first.
+- **Driver-based hires:** Driver × Rate is the **total headcount needed** for that department and role, rounded to
+  whole people per Round: hires = needed − existing employees, never below 0 (3 people + target 5 → 2 hires). If the
+  need falls later, the driver's own hires are removed and counted as terminations; existing employees are never cut
+  (app source). Role is one of the saved staff's roles. Start and End default to the plan's
+  cutover and its last month. `operand1: ['Revenue']` picks by name: on a company whose revenue is just "Revenue" it's total
+  revenue (every revenue account and department, This Month), but a sub-account named Revenue is taken instead where
+  there is one. Read back which it took (`listPlanDrivers(planId)`, `inputs.formula.operand1`) and name it to the user. Salaries flow to the department; driver hires aren't in
+  `listStaff()` (read them in the Staffing grids' Driver rows). Listed by `jirav.listPlanDrivers(planId)` as type
+  `staffing`; also made on the Plan Drivers Page ([drivers-overview.md](drivers-overview.md#the-grids)). Example
+  *(help)*: 1 CSM per $1M ARR = ARR × 0.000001, Round Up.
 
 ## Verify
 
-After saving, re-read `listStaff` and the headcount / salaries rows for the affected months
+SAVE CHANGES on Manage Staff shows no success message (`alerts({since})` stays empty); its result and the re-read are
+the check. After saving, re-read `listStaff` and the headcount / salaries rows for the affected months
 (e.g. a 120,000 hire adds 1 head and 10,000 a month from the hire date, less in a hire month
 that starts after the 1st when Prorate Salaries is on; a 10% raise on it adds
 1,000 a month from the raise date).
+
+A driver-based hire's count: read the driver's input for the forecast months (revenue: `readGridValues({maxDepth: 0})`
+on the plan's `revenue` page), work out Driver × Rate rounded per Round, take away the department's staff in that role,
+and compare with the Driver rows in the Staffing grids. 0 hires is right when existing staff already cover the need:
+say so, with the numbers.
 
 ## Gotchas
 
@@ -60,6 +99,7 @@ that starts after the 1st when Prorate Salaries is on; a 10% raise on it adds
   months stay as imported, so the two disagree. Compare the date with the plan's cutover
   (`getPeriods(planId)`) before typing it. If the user gives a start date that's already in actuals
   ("started last month"), say so, propose the first forecast month, and ask.
+- **"End of <month>"** for a term date is that month's last day (`2026-06-30`).
 - **Which year a month means:** for a hire, "March" is the first March on or after the plan's first
   forecast month; for a term date, the first one after the hire date. Say which year you used.
 - **Day of the month matters when Prorate Salaries is on** (Settings → Company → Staffing): a month's
@@ -81,6 +121,5 @@ that starts after the 1st when Prorate Salaries is on; a 10% raise on it adds
 - **No staff, but salary actuals:** when `listStaff` is empty, say the staff list isn't loaded
   rather than answering "0 people".
 
-- **Escape closes the Plan Raise dialog and loses what you typed.**
 - A staffing driver shows 0 headcount when its driver is empty in the forecast (e.g. a plan with no
   forecast revenue).

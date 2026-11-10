@@ -63,7 +63,8 @@ Opened from a driver input's **Range** (Time Options), in plan or global drivers
 be over a custom range with its REMOVE showing, and a script click on a REMOVE opens the delete
 confirm at once.
 - Before any click, move the pointer off the custom-range list.
-- Click a range by its label, from a screenshot. Never click near EDIT / REMOVE unless the user asked
+- Choose a range with `await jirav.pickers.range('<name>')` ([variable-picker.md](variable-picker.md#the-kit)): it
+  clicks the range's name only, then Save. Never click near EDIT / REMOVE unless the user asked
   to edit or delete that range; never click REMOVE by index (there's one per custom range).
 - Verify any change with `listDateRanges()`.
 - The open picker doesn't refresh: a range you just created doesn't appear, and one you deleted

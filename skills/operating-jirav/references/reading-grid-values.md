@@ -2,7 +2,7 @@
 
 **Scope: read-only.** Reads what the current page shows; changes nothing.
 
-`jirav.readGridValues(opts)` (block `scripts/blocks/grid-values.min.js`, pasted after the core) reads
+`jirav.readGridValues(opts)` reads
 **financial values by period** from the page's data grid. It reads the grid's data model
 directly, so it includes rows scrolled out of view or inside collapsed groups, and returns raw
 numbers (no parsing of `$1,234` or `(5.0%)`).
@@ -97,14 +97,16 @@ blank and the row would vanish). With several grids on one page the result is an
   - **Some grids carry no account tags**: locked plans, and some editable ones (seen in one company).
     `jirav.readGridValues` then infers kinds from structure, using the Department filter's value
     (All, or e.g. Unassigned), and adds `kindsInferred` to the output. It doesn't mean the plan is
-    locked: check `listPlans().editable`. The results matched the tagged kinds in testing, but say
+    locked: check the plan's `editable` in `listPlans()`. The results matched the tagged kinds in testing, but say
     so if precision matters.
   - **Plan pages repeat earlier sections.** Each income statement page carries the lines above
     it: the Cost of Sales page also lists the Revenue accounts, OpEx shows Gross Profit, and Other
     shows Operating Income. When gathering accounts across pages, read each page's own section
     (`under: '<section label>'`), or de-duplicate by label. For a section total use
     `match` on the page's section label. Don't sum `total` rows.
-  - **Rows nest**: `under` returns the account rows and their sub-lines (System Salaries, Manual Input…).
+  - **Rows nest**: `under` returns the rows below the one named, not that row itself: `under: '<section>'` gives the
+    account rows and their sub-lines (System Salaries, Manual Input…), `under: '<account>'` only its sub-lines. Read
+    the account row itself with `match` (e.g. `match: /^Rent$/`).
     Don't sum every row: filter by `rowKind` or `maxDepth`.
   - **Labels are the company's own** ("Operating Expenses" in one company, "OpEx" in another). Read
     `{maxDepth: 1}` first to see them; an `under`/`match` that hits nothing comes back with a `note`.
@@ -120,7 +122,9 @@ blank and the row would vanish). With several grids on one page the result is an
   parent's own rows are labelled **"<Dept> (Only)"** (e.g. "S&M (Only)"): that department's own amounts,
   not its children's. The Department filter shows the tree (▸ expands a parent); `listDepartments()`
   gives each department's `parent`.
-- **`truncated`**: filters removed rows. It doesn't mean data is missing.
+- **`truncated`**: filters removed rows. It doesn't mean data is missing. **`kept: 0` with `rows: []`** and no
+  `note`: no row has a value in these columns (e.g. a report page whose range is outside the plan's dates or has no
+  actuals); `{skipEmpty: false}` lists the rows, every value `null`. Tell the user the page is empty for `periods`.
 
 ## Size
 

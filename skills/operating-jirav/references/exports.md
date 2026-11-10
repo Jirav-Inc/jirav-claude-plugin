@@ -5,18 +5,17 @@
 the other direction is [imports.md](imports.md).
 
 **The rule:** exports never trigger the browser's Save prompt and never go to the user's Downloads.
-They're caught in the page with the `exports` block, read there, and moved into Claude's workspace
+They're caught in the page with `jirav.exports`, read there, and moved into Claude's workspace
 only when the file itself is needed. The user gets only the finished result.
 
 ## 1. Turn capture on first
 
 ```js
-// if jirav.exports is missing after the restore line, paste scripts/blocks/exports.min.js; then:
 jirav.exports.capture()   // before ANY Export click
 ```
 
-Capture stays on across `jirav.go()`, and the restore line turns it back on after a reload. Check
-with `window.__jiravExports.on`. An Export clicked while capture is off shows the user a Save prompt
+Capture stays on across `jirav.go()`, and after a reload the kit's first call turns it back on. Not sure
+it's on? Call `capture()` again: it's harmless and answers `'capturing'`. An Export clicked while capture is off shows the user a Save prompt
 that blocks the browser: if that happens, ask them to Cancel it, capture, and export again.
 
 ## 2. Export
@@ -32,6 +31,7 @@ matches, a plan page with the Department filter, or `readGridValues`. State the 
 | One report page | Page title ⋮ → **Export as Excel** | `<Page>.xlsx`, one sheet |
 | Whole package | **Share & Export → Export as Excel** | `<Package>.xlsx`, one sheet per page (Index first). **Dashboard pages are left out**, and `/` in a page name becomes `_` ("A_R Aging Summary"): match sheets to pages that way |
 | Whole package | **Share & Export → Export as PDF** → preview → **EXPORT** → *Select Reports for Download* (tick pages) → **Download** | `<Package>.pdf` |
+| One report page as PDF | The page title ⋮ has no PDF: **Share & Export → Export as PDF** → **EXPORT** → *Select Reports for Download* opens with **every page ticked** (its header box can show unticked: its first click ticks all, the second clears) → tick that page → **Download** | `<Package>.pdf`, named after the package, holding that page |
 | Dashboard | **Share & Export → Export as PDF** → preview → **EXPORT** | `<Dashboard>.pdf` |
 | A plan grid | Right-click a cell → **Export** → CSV Export / **Excel Export** | `<Page>.xlsx` (e.g. `Operating Expenses.xlsx`, 11 KB) |
 | One dashboard tile | Tile ⋯ → **Export** (click, it doesn't open on hover) → PNG / PDF / SVG / **CSV** | `<Tile>.csv`: `Time Period` + one column per series, UTF-8 with BOM |
@@ -81,6 +81,10 @@ await jirav.exports.readXlsx(i, {formulas: 'text'}) // formulas as "=…" instea
 4. Give the user the finished result, in the chat or in a folder they name. The raw export stays in
    the workspace unless they ask for it.
 
+If the user only wants the export file itself, don't move it through the conversation: it's already
+saved in the file store (`ex.list()` gives its `path`), so `await jirav.files.export(path)` downloads it
+in one go; tell them to approve the download prompt ([file-store.md](file-store.md)).
+
 The bytes pass through the conversation, so size matters. Excel exports are small (a page 4–20 KB,
 a 10-page package ~20 KB). PDFs are not (a dashboard 160 KB, a 10-page package 770 KB): never
 move a PDF to get numbers, only when the user needs that PDF. Over ~1 MB (a large package PDF is
@@ -88,7 +92,8 @@ several MB, dozens of reads), don't move it: export fewer pages, or summarize fr
 
 ## Notes
 
-- Files caught in the page are lost on a reload: move what you need first.
+- Files caught are also saved in the file store, so a reload loses nothing: `await jirav.exports.load(path)`
+  brings one back (paths from `jirav.files.list('<company>/exports/')`).
 - `jirav.exports.release()` switches capture off, so the next export prompts the user. Don't use it
   in normal work.
 - A package PDF export can show the "Applying changes…" overlay for ~15 s. It changes nothing: `await jirav.waitIdle()`.

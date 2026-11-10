@@ -1,8 +1,8 @@
 # GL actuals: adding a month (Excel / JiravExcel, or a connector)
 
 **Scope: company-wide, changes actuals in every plan.** Where: Settings → Integrations → Actuals →
-Accounting → **Manual import** (`/<tenant>/setup/integrations`). Uses the `imports` block (paste
-`scripts/blocks/imports.min.js`; general rules: [imports.md](imports.md)). For every change, follow
+Accounting → **Manual import** (`/<tenant>/setup/integrations`). Uses `jirav.imports` (general
+rules: [imports.md](imports.md)). For every change, follow
 **Edits** in SKILL.md.
 
 ## 0. Where the month stands (reads only, before asking for anything)
@@ -38,10 +38,19 @@ user's Downloads (the kit doesn't fetch it: it's on a file host outside jirav.co
 conversation or gives Claude access to their Downloads folder (Cowork asks for the folder; in Claude Code,
 its path). Then fill it in together.
 
+**Departments:** an import keeps every department the file leaves out, with its rows; it matches departments by
+**Department ID** (Jirav doesn't show it), and a new ID adds another department beside the old one. So
+`im.accountingCheck` lists `departments`: Jirav's accounting departments the file doesn't name, the Jirav
+departments they feed and their actuals in the file's months. `upload` refuses while one of those holds
+actuals, unless the user means to keep them: `{keepDepartments: [names]}`. To clear one, add it to the file
+with its ID from the import that created it and an explicit 0 for each row.
+
 Tabs (data from row 5): **COA** (Account ID, Parent ID, Account Name, Class, Category, Function, Number),
 **Income Statement** (Account ID, Department ID, Calendar Month, Amount: that month's activity), **Balance
-Sheet** (Account ID, Calendar Month, Balance: month-end balance; **no Retained Earnings / YTD earnings**:
-Jirav computes them). Months are dates; each account × (department ×) month once. Company Setup (incl.
+Sheet** (Account ID, Calendar Month, Balance: month-end balance). **Retained Earnings is prior years' profit
+only**: Jirav uses the file's balance as is and adds this year's profit itself (System Net Income, from the
+fiscal year start), so at each fiscal year start the file's Retained Earnings goes up by last year's profit.
+No current-year earnings account. Months are dates; each account × (department ×) month once. Company Setup (incl.
 Close Month) and Departments are optional, but a tab left in the file with no rows fails the import: fill
 it or `im.dropSheets(i, [names])`. The kit can't add a tab: if the file has no Company Setup tab, the
 import leaves the close month on the current month (seen; whether a later import also overrides a
@@ -81,7 +90,7 @@ Add `M`'s rows with `im.edit` (cells already in the file keep their date and cur
   creates an empty new one isn't tested: treat it as delete + new, and say so. The safe default is to
   keep the old name in the file. Read `listPlanDrivers` / report setups for the old name before proposing.
 - **`adds`**: new accounts are fine; check Class and Category (ask, or propose from similar accounts).
-- **`accountingCheck` missing or no result:** paste the `imports` block again and retry once. Still
+- **`accountingCheck` missing or no result:** check the kit (SKILL.md) and retry once. Still
   nothing: compare the file's COA names with `getChartOfAccounts()` yourself and say that's what you did.
   `upload` runs the same check, so if it hangs, nothing was imported: say so, don't report success.
 

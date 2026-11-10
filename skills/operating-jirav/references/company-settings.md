@@ -17,10 +17,13 @@ staffing: {countLeaversInTerminationMonth, prorateSalaries, averageHoursPerWeek}
 | Staffing | Count terminated employees in headcount for their termination month (on/off), Prorate salaries (on/off), average hours per week for hourly staff |
 | Labels | Rename the standard statement labels (Revenue, COGS, Gross Margin, …). A label shows in the plan sidebar and page titles, but **plan grid rows keep the standard name** ("Revenue"), and so does `readGridValues`. **RESTORE DEFAULT LABELS applies at once, with no confirmation and no Save**: read the current labels first and say which custom ones it will wipe |
 
-**Close month** drives "Close Month" date ranges and is what `jirav.getPeriods().closeMonth`
+**Close month** drives "Close Month" date ranges and is what `(await jirav.getPeriods()).closeMonth`
 returns. `getPeriods()` also gives `closeMonthSource`:
 - **`Specific Date`** (7 of 16 companies checked): set in Jirav, Settings → Company → Accounting → Close
-  Month (year + month) → Save. It means "closed through that month", so closing the next month moves it
+  Month: two lists both labelled "Close Month" (year `nth: 0`, month `nth: 1`): open one
+  (`jirav.click({label: 'Close Month', kind: 'dropdown', nth: 1})`), choose its option (`jirav.click({label: 'Jan',
+  kind: 'option'})`), then the page's save bar (`await (await jirav.saveBar()).press()`). Check with
+  `(await jirav.getPeriods()).closeMonth`. It means "closed through that month", so closing the next month moves it
   forward one. Changing it **doesn't move any plan's actuals period** (roll that separately:
   [plans.md → Periods](plans.md#periods-and-manage-plans-columns)).
 - **`Accounting system`** (9 of 16): read-only in Jirav; it follows the accounting system's own close

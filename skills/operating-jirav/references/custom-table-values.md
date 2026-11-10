@@ -15,7 +15,7 @@ read-only. Find tables with `await jirav.listCustomTables()` → `[{id: "custom-
    **Delete**; it reads 0 until SAVE, then blank. Don't report that 0 as a typed value.
 4. **SAVE** in the bottom bar (CANCEL discards all pending edits). Line totals and drivers update
    only after SAVE. A reload or navigation before SAVE **drops the edits** (a person may get a
-   "Leave site?" prompt; automation doesn't): before leaving, check `jirav.saveBar().pending` is
+   "Leave site?" prompt; automation doesn't): before leaving, check `(await jirav.saveBar()).pending` is
    false. Reload and re-read to verify.
 
 A section with a Subtotal shows its total on the section row itself (there's no separate Subtotal
@@ -47,7 +47,7 @@ report. Say you rolled it up.
 - **Ratio and percent lines** (conversion %, margin %): Average takes the mean of the monthly %, which
   isn't the period's ratio. For "Q1 conversion" recompute from the component lines (Σ Leads ÷ Σ
   Traffic) and say so, or read a Formula Based line from a report.
-- **Which quarter or year:** fiscal (`getPeriods().fiscalYearStartMonth`) unless the user says calendar;
+- **Which quarter or year:** fiscal (`(await jirav.getPeriods()).fiscalYearStartMonth`) unless the user says calendar;
   say which you used.
 
 For bulk values users often import from Google Sheets or Excel (lines with Allow Import = YES). To import, see [imports.md](imports.md).

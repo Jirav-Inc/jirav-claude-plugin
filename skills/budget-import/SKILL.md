@@ -11,7 +11,7 @@ Takes the user's budget file and loads it into a Jirav plan through Settings →
 
 **Ask, don't assume.** Budget files are messy, and a wrong guess loads a wrong budget that looks right. Every decision listed in [section 4, Questions](#questions-one-batched-list) is the user's: ask it, in **one numbered list**, before you build the mapping. Never resolve one by picking the "obvious", "preferred", first, middle or best-tying option, and never decide it inside a proposal the user is only asked to approve.
 
-Runs on top of the `operating-jirav` skill: use its kit (the restore line, the `jirav.imports` block, `readGridValues`, `listPlanDrivers`) and its Edits rules (propose once, get an explicit yes, verify, log). The user signs in; never type credentials.
+Runs on top of the `operating-jirav` skill: use its kit (`jirav.imports`, `readGridValues`, `listPlanDrivers`) and its Edits rules (propose once, get an explicit yes, verify, log). The user signs in; never type credentials.
 
 ## When to use
 
@@ -28,7 +28,7 @@ Runs on top of the `operating-jirav` skill: use its kit (the restore line, the `
      - **Controller Essentials** has one budget plan and can't add plans. Loading next year's budget into it **overwrites this year's**, and the rest of this year's budget vs actual is lost. Say so first, and offer to export the current budget (a plan-grid Excel export, [exports.md](../operating-jirav/references/exports.md)) or to wait until year-end.
      - **CFO**: a new plan for the budget is **Add New Plan** ([plans.md → Periods](../operating-jirav/references/plans.md#periods-and-manage-plans-columns)): set the actuals to end the month before the budget year and the forecast to the budget year, then Save. At the 5-active-plan limit, ask which plan to archive; if it's the Current PoR, say what reports will show instead ([plans.md → Plan of record](../operating-jirav/references/plans.md#plan-of-record-and-other-plan-facts)).
    - Check `getAutoForecast(planId).plan.enabled`. A budget plan normally has Auto-Forecast off: while it's on, it hides typed values and drivers on accounts inside a group (the elimination driver and imported budget values included), adds to typed values on top-level accounts (drivers there may stop: check `misconfigured`), and zeroes System Salaries.
-2. **Departments.** `getSubscription().departments` says whether the company has departments. If it does, use `jirav.listDepartments()` and `getDepartmentMappings()`: the template has one row per account × master department, so departments must be set before the import.
+2. **Departments.** `(await jirav.getSubscription()).departments` says whether the company has departments. If it does, use `jirav.listDepartments()` and `getDepartmentMappings()`: the template has one row per account × master department, so departments must be set before the import.
 3. **The user's file.** Read it in the workspace (the `xlsx` skill, or Python), not in Jirav. Read **every** tab, hidden ones included. List:
    - its account labels, and which rows are the file's own **subtotal or total rows** (Total Revenue, Gross Profit, Total OpEx, EBITDA, Net Income, Total <department>…) and total columns (quarters, FY). These are never imported: they are what you tie out to.
    - its department labels (a column, a block or sheet per department, or none)
@@ -86,6 +86,12 @@ Steps (verified):
 8. Click **Save**. Expect the toast "New driver(s) created for Wages (<Dept>)".
 9. Repeat for each department with staff.
 
+With `jirav.driverForm` ([plan-drivers.md → the driver form](../operating-jirav/references/plan-drivers.md#the-driver-form)),
+steps 3 and 5–8 are one call once the form is open: `jirav.driverForm.set({name, operator: '*', input2: -1, end:
+['Specific Date', <year>, '<Mon>']})` (`end` only for step 7), then `save()` after the yes. **Input 1 stays a screen
+step** (step 4): the kit picks an element by name but doesn't set the picker's Department to This Department.
+Check `read().input1` shows Salaries before saving.
+
 **Verify** with `readGridValues({under: 'Wages', kind: 'forecast'})`. For each department, System Salaries + the driver = 0, and Wages = the Manual Input value. Also check that `listPlanDrivers(planId)` shows `misconfigured: false`.
 
 ### Option 2 (not preferred): plug the difference
@@ -103,7 +109,7 @@ Never pick the approach yourself, and never import wages on top of System Salari
 Always start from Jirav's own template for the target plan. A workbook written from scratch, or re-saved by openpyxl, can be rejected.
 
 ```js
-// on /<tenant>/setup/integrations, after the restore line; paste blocks/imports.min.js if jirav.imports is missing
+// on /<tenant>/setup/integrations
 const im = jirav.imports;
 const t = await im.template('budget', {planId});
 const rows = await im.rows(t.i, 'Income Statement');   // header on row 5
@@ -127,7 +133,7 @@ Fill all Income Statement cells in one `im.edit(t.i, 'Income Statement', {cell: 
 - one sample row read back with `im.rows`
 - that the Balance Sheet sheet still holds the prefilled balances (non-empty numeric cells from row 6)
 
-**Keep the inputs.** The in-page file is lost on any page load, and `im.readBase64` can't write into the cloud workspace by itself. Keep the edits object (or the user's source file) so the file can be rebuilt, and upload in the same page session as the build.
+**Keep the inputs.** The template and each built file are saved in the file store as they're made (`im.list()` gives each `path`), so a page load loses nothing: `await im.load(path)` brings the built file back. Keep the edits object too, so the file can be rebuilt if the mapping changes.
 
 **Morph the user's file into the template** (in the workspace, before touching Jirav), in this order: questions, mapping, tie-out. Don't build the edits object before the questions are answered.
 
@@ -179,15 +185,27 @@ After the questions are answered, one message with:
 - the Balance Sheet treatment the user chose: carried forward as prefilled, or the user's balances
 - that the import replaces direct line input in **this plan only**
 
-Get an explicit yes. If the user changes anything, update the mapping and the tie-out and propose again. Never upload before the yes. On a first edit in the session, also ask where to keep the build log (in the questions message).
+Get an explicit yes. If the user changes anything, update the mapping and the tie-out and propose again. Never upload before the yes. On a first edit in the session, also say once that you keep a change log in this browser and can export a copy (in the questions message).
 
 ## 6. Upload
 
+Three steps, each its own browser call:
+
 ```js
-await im.upload('budget', f.i);          // opens "Import Budget Data"
-// if the dialog shows a spinner, real-click a blank area inside it once (a script click doesn't count)
-await im.finish('<plan name>');          // selects the plan, presses UPLOAD TEMPLATE, returns Jirav's message
+// 1
+await jirav.imports.upload('budget', f.i);     // opens "Import Budget Data"
 ```
+
+2. Real-click a blank area inside the dialog once (a script click doesn't count).
+
+```js
+// 3
+await jirav.imports.finish('<plan name>');     // selects the plan, presses UPLOAD TEMPLATE, returns Jirav's message
+```
+
+If a call returns `call` (Jirav is still processing), make that call; never upload again. After a dropped call,
+`jirav.imports.outcome()` first. A `refused` result names an upload still running or an import into this plan
+Jirav logged in the last minutes: tell the user and re-import only on their word ([imports.md](../operating-jirav/references/imports.md#how)).
 
 Expect `success: All rows were recognized and imported successfully.` Report any warning verbatim.
 
@@ -221,7 +239,8 @@ Report to the user:
 **Undo:**
 - Blank **Income Statement** cells don't clear typed values. Delete them in the plan grid and SAVE, or re-import corrected numbers.
 - **Balance Sheet:** if balances were wiped, the repair in section 2.
-- To remove a driver, click its child row under Wages → 🗑 in the Formula bar, then confirm with `listPlanDrivers`.
+- To remove a driver: `jirav.driverForm.selectRow('<driver name>', {account: 'Wages'})`, then the Formula bar's delete
+  (`jirav.click({label: 'delete', where: 'formula: <driver name>'})`) → Yes; confirm with `listPlanDrivers`.
 
 ## Gotchas
 
@@ -231,4 +250,5 @@ Report to the user:
 - Put each line in the department the user's file gives it. If that isn't where the company's actuals for that account usually sit (e.g. revenue budgeted under S&M but booked to Unassigned), flag it: budget vs actuals by department won't line up.
 - If the roster's department mix differs from the actual wage mix by department, flag it: a department-level budget vs actuals view will show the difference.
 - Auto-Forecast on in the budget plan hides or adds to the imported values and drivers, the elimination driver included ([plans.md → Auto-Forecast](../operating-jirav/references/plans.md#auto-forecast)). Keep it off unless the user wants it.
-- Driver menus open with a short animation. When scripting clicks, pause about 1 s between opening a menu and clicking an item.
+- Driver menus open with a short animation: `jirav.click` waits for an item to stop moving before clicking it. Clicking at
+  screen points instead, pause about 1 s between opening a menu and clicking an item.

@@ -7,7 +7,7 @@ where the data shows: [staffing.md](staffing.md), [custom-table-values.md](custo
 [plans.md](plans.md). Reading what was imported and when: [integrations.md](integrations.md).
 
 **Always fetch Jirav's template first and edit that file**: never write a workbook from scratch (the
-one exception: a first staff list, below). No OS file chooser is ever opened: the `imports` block
+one exception: a first staff list, below). No OS file chooser is ever opened: `jirav.imports`
 fetches the template, edits cells in the page, and hands the file to Jirav's upload code, so Jirav's
 checks and result messages still run.
 
@@ -29,13 +29,18 @@ companies: see [excel-actuals.md](excel-actuals.md).
 ## How
 
 ```js
-// if jirav.imports is missing after the restore line, paste scripts/blocks/imports.min.js; open Settings → Integrations
+// open Settings → Integrations
 const im = jirav.imports;
 const t = await im.template('budget', {planId});                 // or 'staff', 'customActuals', 'customBudget'
 const r = await im.findRow(t.i, 'Income Statement', {A: 'Rent', D: 'General and Administrative'});
 const c = await im.monthColumn(t.i, 'Income Statement', '2026-07');
 const f = await im.edit(t.i, 'Income Statement', {[c + r]: 2500});   // a new file; the template is untouched
-await im.upload('budget', f.i);
+```
+
+Then, after the user's yes, the upload in a browser call of its own (it changes data):
+
+```js
+await jirav.imports.upload('budget', f.i);
 ```
 
 - `sheet` is the sheet name; `null` means the first sheet (the only one in staff and custom templates).
@@ -52,12 +57,22 @@ await im.upload('budget', f.i);
   rejected ("Error during reading file content").
 - **Staff list, custom-table actuals:** `upload` sends the file and returns Jirav's result.
 - **Budgets:** `upload` opens *Import Budget Data*, which waits for a real user event: **real-click
-  inside the dialog once** (a script click doesn't count), on a blank area, not text (even if the plan list already shows), then `await im.finish('<plan name>')` picks
-  the plan, presses UPLOAD TEMPLATE and returns the result. A click **outside** the dialog closes it
+  inside the dialog once** (a script click doesn't count), on a blank area, not text (even if the plan list already shows), then, in the next browser call, `await jirav.imports.finish('<plan name>')` picks
+  the plan, presses UPLOAD TEMPLATE and returns the result.
+- **Sent once.** After a dropped `upload` or `finish`, call `jirav.imports.outcome()` first (it waits for an import
+  still running in the page, then reads Jirav's message or its audit log); upload again only if Jirav logged
+  nothing and the user agrees. `upload` and `finish` refuse (`{ok: false, refused, why, found?}`) while an upload
+  of the page has no result yet, and when Jirav's audit log has an import of the same kind (a budget: into the
+  same plan) in the last 15 minutes. Tell the user; pass `{importedBefore: [<audit ids>]}` (to `upload`; it carries
+  to `finish`) only if they want the file imported again as well. When Jirav's result takes longer than the call,
+  the result is `{pending: true, call: 'jirav.imports.outcome()'}`: make that call; never upload again. A click **outside** the dialog closes it
   without a message: take a fresh screenshot right before that click. If `finish` says "No dialog
   open", nothing was imported: run `upload` again.
-- Results come from the alert log (`jirav.alerts()`); success alerts close themselves.
-- Keep the untouched template (`im.list()`): for staff it is the restore file.
+- Results come from the alert log (`await jirav.alerts()`); success alerts close themselves, and an error shown during
+  `upload` / `finish` / `outcome` is in its result, then closed. A budget whose Import Budget Data dialog is still
+  loading is still being processed: `outcome()` says `pending` until Jirav answers.
+- The untouched template stays in the file store (its `path` is in `im.list()`; after a reload,
+  `await im.load(path)`): for staff it is the restore file. See [file-store.md](file-store.md).
 - Build each upload, including an undo, from a **freshly fetched** template, fetched right before
   building: staff and custom-actuals templates are prefilled with what Jirav holds now (the
   custom-actuals header moves with it), and the budget template's Balance Sheet with the latest balances.
@@ -67,7 +82,7 @@ await im.upload('budget', f.i);
 | | Template (`im.template`) | What the upload does | Undo |
 |---|---|---|---|
 | `staff` | **Not when an HR system is connected** (`getDataStatus().workforce.source` names it, e.g. `rippling-api`; the kit checks): then staff are changed in that system. With none connected the source is Excel (Jirav reports it as no source until a first import). The template is the current staff list, so editing it leaves everyone else unchanged; check its row count matches `listStaff` first. **With no staff list yet the template can't be fetched by script** (it redirects to a download): build the first file with these columns and pass it to `im.fromBase64`. Columns: Last Name, First Name, Department, Unique ID (`"20.0"`; match people by name), Hire Date, Termination Date, Job Title, Compensation Amount, Compensation Unit. Departments use the workforce names (`S&M: Sales`) | **Replaces the whole list**: people missing from the file are removed, others updated by Unique ID, new rows added | Upload the untouched template |
-| `customActuals` | Row 1 `Version·2·type·custom lines`, row 3 `Table Name·Custom Line·` months as text, then one row per importable line, **prefilled with stored actuals** (an explicit empty cell for every month without a value). Header: with no data, Jan two years back → Dec next year (e.g. 2024-01 … 2027-12); once a line has data, its first data month → today. Find columns with `monthColumn`, not fixed letters; for a month outside the header it says which cell to add (`{AY3: '2019-01-01'}`) | **Every line in the file is re-imported**, and only the header's months change. An **empty cell** (`null`) **clears** that month; a cell absent from the row (as in a blank template row) leaves it as is. So delete the rows you're not changing, or build from a template fetched just before | Upload the same months with empty cells (`null`) |
+| `customActuals` | Row 1 `Version·2·type·custom lines`, row 3 `Table Name·Custom Line·` months as text, then one row per importable line, **prefilled with stored actuals** (an explicit empty cell for every month without a value). Header: with no data, Jan two years back → Dec next year (e.g. 2024-01 … 2027-12); once a line has data, its first data month → today. Find columns with `monthColumn`, not fixed letters; for a month outside the header it says which cell to add (`{AY3: '2019-01-01'}`) | **Replaces every Excel-imported custom actual in the company, in every table.** Each line × month with a value in the file is set; every stored Excel actual **not** in the file is **deleted**: another table's lines, a row you removed or blanked, an empty cell. So always start from a template fetched just before (it holds every stored actual) and change only the cells you mean to: never remove or blank rows you aren't changing. `upload('customActuals', i)` checks first (`im.customCheck(i)` shows the same; both need the file number `i`): it refuses a file that would delete stored actuals unless you pass `{removes: ['<table> / <line>', …]}` naming exactly those lines, after the user's yes, and a file with a line Jirav doesn't have (it would be skipped: create the line, with Allow Import, first). A cell that isn't a plain number (`n/a`, `1,234`, `$66`, `-`) counts as a delete: Jirav discards it and still deletes the stored value. It also refuses a file Jirav would read differently or reject: not version 2 (row 1 `Version 2`), a header cell that isn't a month, or the same table and line twice | Upload the template fetched before the import (it stays in the file store: `im.load(path)`) |
 | `budget` | Per plan, forecast months only, prefilled with the plan's typed values. *Income Statement*: one row per account × department (`Category`). *Balance Sheet*: prefilled with current balances | Values become typed input ("Manual Input" rows, department in `attrs.Department`). Jirav warns it "will replace any existing direct line input". **Empty Income Statement cells don't clear; empty Balance Sheet cells import as 0** | Delete the cells in the plan grid and SAVE ([plans.md](plans.md#type-values)) |
 | `customBudget` | Per plan: header on row 4 (`Table Name·Custom Line·` forecast months), one row per line. Both custom templates list only lines with Allow Import = YES | As budget, for custom lines | As budget: click the cell on the custom-table page, **Delete**, SAVE |
 

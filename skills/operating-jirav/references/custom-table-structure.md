@@ -14,7 +14,7 @@ single encoding). `/setup/custom-tables` without the trailing slash lands on the
 `misconfigured: true` in `jirav.listGlobalDrivers()`. The delete dialog doesn't warn about this,
 so check that list first and ask about those drivers too ([global-drivers.md](global-drivers.md)).
 
-**Helpers.** Paste `scripts/blocks/custom-table-structure.min.js` after the core to get `const ct = jirav.customTableStructure`.
+**Helpers.** Use `const ct = jirav.customTableStructure`.
 It only reads and locates; you do the clicks.
 
 | Helper | Returns |
@@ -36,12 +36,12 @@ point → click it → check `ct.rows()`. If `jirav.menu()` comes back empty, th
 focused the button: click once more.
 
 **Read the structure** before and after every change (`ct.structure()` does this):
-`GET <base>/v1/customTable/<customTableId>` returns `customTableConfig.elements`, an ordered tree.
+`ct.structure()` returns `{id, name, elements}`: the saved rows in order, each `{type, id, label}`.
 
-- **Section:** `{section:{id,label,subtotal,children}}`. Sections can contain sections.
-- **Line:** `{manualLine:{id,label,format,aggregation,color,allowImport}}`
-- **Reference:** `{lineReference:{id,address:{category,department,isAcct},includeChildrenUpToLevel}}`
-- **Blank row:** `{separator:{id}}`
+- **Section:** `type: 'section'`, with `subtotal` and `children` (sections can contain sections).
+- **Line:** `type: 'manualLine'`, with `format` and `periodValue`.
+- **Reference:** `type: 'lineReference'`, labelled `(reference <category>)`.
+- **Blank row:** `type: 'separator'`, labelled `(blank row)`.
 
 List order is sidebar order. Line IDs stay the same through moves and indent changes, so the
 line's values stay attached. **A Row Type change does not keep them** (see Row fields).

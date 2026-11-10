@@ -20,7 +20,7 @@ once, in the proposal, and never again (not in a finding, publish or share line,
 
 0. **Unended month:** if the user names a month that hasn't ended, stop now, before any other read:
    say so, offer the last ended month, and send the End table (every step `Waiting`).
-1. **Subscription:** `getSubscription().subscription`. **Controller Essentials** and **CFO** close
+1. **Subscription:** `(await jirav.getSubscription()).subscription`. **Controller Essentials** and **CFO** close
    differently (below). `null`: say the subscription isn't known and ask before going on.
 2. **Plans:** `listPlans()` and `listArchivedPlans()`. Never infer a plan's role from its name or id,
    with one exception: a plan named `<plan> - <Mon-YY> snapshot` (or `… PoR`) is a snapshot of
@@ -51,7 +51,7 @@ once, in the proposal, and never again (not in a finding, publish or share line,
    it's an auto-pick, say whether the roll (a later cutover) could make Jirav pick a different plan;
    a real PoR: say nothing about the roll. No other commentary on Current POR behaviour unless read.
 4. **Closing month** (`M`): `getPeriods()` → `closeMonth`, `closeMonthSource`, `accountingCloseMonth`;
-   `getPeriods(planId).plan.actuals`; `getDataStatus()` → `actualsThrough`.
+   `(await jirav.getPeriods(planId)).plan.actuals`; `getDataStatus()` → `actualsThrough`.
    - The user names a month → that month.
    - Otherwise, **Accounting system**: `M` = the month after the plan's last actual month. **Specific
      Date**: `M` = the month after the close month.
@@ -76,7 +76,7 @@ once, in the proposal, and never again (not in a finding, publish or share line,
    forecast in the plan), `the roll` (`M` actual, not rolled), `the snapshot` (`M` already actual and rolled, no snapshot found), `Make PoR`, `step 4`; never a list,
    never "starting at step 1"; a Make PoR skipped by default is no part. If traces
    contradict each other (e.g. Current POR moved but there's no new PoR), say what reports show now and ask.
-6. **Auto Roll Forward** (`listPlans().autoRollForward`, CFO and Essentials):
+6. **Auto Roll Forward** (each plan's `autoRollForward` in `listPlans()`, CFO and Essentials):
    - on, and the plan's actuals already include `M`: skip the manual roll and say exactly: "Auto Roll
      Forward rolled `<plan>` on `<date>` (from Plan Details), before the books-closed and Balance
      Sheet checks (steps 2–3)." No read gave the date: `(inferred from its roll day)` replaces
@@ -113,14 +113,15 @@ with their scope (this plan / company-wide) in run order (steps 2–3; step 1's 
 if the Make PoR line is make or recommended make, exactly
 `Make PoR (company-wide): after the roll, with its own yes.`; then 4–10), and
 these questions, each asked once in the run, in one numbered list right before `OK to go ahead?`:
-the edit-log folder; books closed for `M` and the orange triangle (step 2); the optional
+books closed for `M` and the orange triangle (step 2); the optional
 Balance Sheet tie-out (step 3); staffing (4); custom actuals (5); budget changes (6); extending the
 Forecast Period (only if step 1 offers it); and the packages (10), exactly
 `Packages to publish (all proposed): <list>. Which?`, listing every LIVE package except Test, ZZ and `_1` copies.
-- **Edit log:** "no log" (or no folder) means no log file and no log table, whatever build-log.md
-  says. The first result message after a change ends its result part (only a request or question
-  follows) with `Edit log: not kept, as you asked.` or the kept log's full path (`<folder>/jirav/YYYY-MM-DD.csv`,
-  also in `Open:`); never in the publish result (nothing changed before it: end the steps 4–9 message).
+- **Edit log:** kept in this browser by `jirav.log` ([build-log.md](../operating-jirav/references/build-log.md))
+  unless the user said not to keep one ("no log" means no log rows and no log table). The first result
+  message after a change ends its result part (only a request or question follows) with exactly
+  `Edit log: kept in this browser; ask me for a copy.` or `Edit log: not kept, as you asked.`; never in
+  the publish result (nothing changed before it: end the steps 4–9 message).
 - **Make PoR** goes in the proposal as its own line with its reason (step 1 rule), in exactly one
   form (Essentials: `Make PoR: not on Controller Essentials.`):
   - recommended skip: `Make PoR: skipped (default), because <reason>.` (one sentence, with
@@ -168,15 +169,16 @@ ahead). Then step 1, then 4–10.
 
 **1. Snapshot, roll forward, Plan of Record.** Order: Excel workpaper export → clone → rename → roll →
 re-read Current POR → Make PoR (if make).
-- *CFO:* **snapshot** = Clone the plan being closed; it lands in **Archived**. Find the new clone by
-  the planId new in `listArchivedPlans()`, not the `_1` name; rename it there to
-  `<plan> - <Mon-YY> snapshot`, Save, and read the name back. **Don't make it active**: the plan being closed stays
+- *CFO:* **snapshot** = `jirav.managePlans.clone(plan)`; the copy lands in **Archived** and the result names it
+  (`cloned`, `planId`). Then `jirav.managePlans.rename(<its planId>, '<plan> - <Mon-YY> snapshot')`, which saves and
+  reads the name back. **Don't make it active**: the plan being closed stays
   active and reports keep using it ([plans.md → Copy, activate, delete](../operating-jirav/references/plans.md#copy-activate-delete)).
   A plan already so named, active or archived, is item 5's snapshot: reuse it as is (`archiveTime` or `active`).
 - *Controller Essentials:* no clone, archive or Make PoR: say so. Roll the **forecast plan**; the
   budget plan stays fixed.
-- **Roll forward:** the plan's Actuals Period → Custom Range, **keeping the current start month** and
-  ending at `M` → Apply → Confirm Plan Date Changes → Yes → Save
+- **Roll forward:** `jirav.managePlans.periods(plan, {actualsEnd: M})` (the start month stays), which stops at Jirav's
+  Confirm Plan Date Changes and returns its `warning` (typed forecast values up to `M` are overridden with actuals);
+  after the yes, `jirav.managePlans.confirm()`
   ([plans.md → Periods](../operating-jirav/references/plans.md#periods-and-manage-plans-columns)).
   It replaces the plan's forecast for those months with actuals, and drivers recalculate the
   remaining forecast months: say both in the proposal. The step 1 result always gives
@@ -244,7 +246,7 @@ is normal for a file source such as JiravExcel. If the actuals don't reach `M`, 
 - JiravExcel: add the month to the user's last import file and import it (own yes, **Import
   safety**, [excel-actuals.md](../operating-jirav/references/excel-actuals.md)). Keep or add the
   Company Setup tab with Close Month = the current close month (without it the close month falls
-  back to the current month), and after the import check `getPeriods().closeMonth` didn't change;
+  back to the current month), and after the import check `(await jirav.getPeriods()).closeMonth` didn't change;
   if it did, report it. With no file from the user, **for the user** (Integrations → Actuals →
   Accounting → Manual import);
 - no source: the company has no actuals feed. Stop and ask how actuals get into Jirav.
@@ -315,7 +317,7 @@ budget unless the user asks in so many words, and first say which budget-vs-actu
 
 **8. Close month.** Settings → Company → Accounting → Close Month
 ([company-settings.md](../operating-jirav/references/company-settings.md)). **Specific Date** → set it
-to `M` only if it's before `M` (at `M` or later: `Done (no issues)`; never move it back) and Save (own yes), then check `getPeriods().closeMonth`. Before saving, say that report and
+to `M` only if it's before `M` (at `M` or later: `Done (no issues)`; never move it back) and Save (own yes), then check `(await jirav.getPeriods()).closeMonth`. Before saving, say that report and
 tile ranges anchored on the close month move with it (`listDateRanges()`, `start.pointer:
 'CLOSE_MONTH'`). **Accounting system** → read-only: confirm it equals `M`; if not, **for the user**,
 close the month in the accounting system.
@@ -354,7 +356,7 @@ the plan it should compare against keeps it steady (your call): <paths>.`
 
 Always send this as the last message, even after an early stop or a refusal: a table, then the two
 lines below it, then one line `Open: ` listing only For-you items (e.g. `share <package> <Mon YY> (for you)`), unanswered
-questions word for word and the kept log path, or exactly `Open: none`.
+questions word for word, or exactly `Open: none`.
 
 | Step | Status | What changed |
 |---|---|---|

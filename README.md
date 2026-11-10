@@ -25,7 +25,7 @@ guide](https://jirav-inc.github.io/jirav-claude-plugin/install-guide/)):
 
    <img src="https://jirav-inc.github.io/jirav-claude-plugin/install-guide/img/02-add-marketplace.png" width="560" alt="Add, then Add marketplace">
 
-3. Paste `Jirav-Inc/jirav-claude-plugin`, click **Use "Jirav-Inc/jirav-claude-plugin"**, leave
+3. Enter `Jirav-Inc/jirav-claude-plugin`, click **Use "Jirav-Inc/jirav-claude-plugin"**, leave
    **Sync automatically** on, and click **Sync**.
 
    <img src="https://jirav-inc.github.io/jirav-claude-plugin/install-guide/img/05-sync.png" width="560" alt="The repository entered, Sync automatically on, Sync">
@@ -65,41 +65,53 @@ Updates arrive when Jirav publishes a new version (each release is listed under 
 - **budget-import**: loads an annual budget from Excel into a plan through Jirav's Budget Import, by
   department. It keeps payroll from being counted twice when your staff roster already drives salaries,
   leaves Balance Sheet balances intact, asks before uploading and checks the result.
+- **consolidation**: rolls several Jirav companies up into one consolidated company, in one
+  currency: maps the accounts, eliminates intercompany, translates foreign companies (your own
+  rates or the ECB's), checks everything, gives you a workpaper and imports the result after you say yes.
 - **cash-trace**: answers the cash questions a CEO asks: what happened to cash, where the forecast
   says it's going (low point, burn, runway) and what it would take to stay above a cash goal, with
   each lever sized. Read-only; every figure ties back to Jirav's cash.
 
 ## What this plugin runs and connects to
 
-- **No hooks, MCP servers, commands or installs.** The plugin is skills (Markdown instructions) plus a
-  JavaScript helper, the "kit", in `skills/operating-jirav/scripts/`: `jirav.js` and `blocks/*.js` with
-  comments, and `*.min.js`, the same code without comments (not obfuscated), which is what Claude pastes.
+- **No hooks, MCP servers, commands, installs or code.** The plugin is skills (Markdown instructions)
+  only. The helper Claude uses in Jirav, the "kit" (`window.jirav`), is part of Jirav itself: Jirav
+  serves it on its own pages, signed and checked by Jirav, and it does nothing until Claude calls it.
 - **Where it runs:** only inside your own signed-in Jirav browser tab (Claude in Chrome or Cowork's
   browser). Nothing runs on your computer outside that tab.
 - **What it connects to:** only Jirav: `app.jirav.com` and your company's Jirav API host
   (`*.jirav.com`), with your existing session. Some reads use POST, as Jirav's own pages do. It has no
   other network destinations, sends nothing elsewhere, and stores no credentials. The kit enforces this
-  itself: it refuses to load on any page other than `https://app.jirav.com`, and every request it makes
+  itself: it refuses to run on any page other than `https://app.jirav.com`, and every request it makes
   goes through one function that refuses any host that isn't `https://…jirav.com`.
-- **How it changes data:** through Jirav's own screens (Claude clicks, types and saves), and only after
-  you approve each change. Imports go through Jirav's own import cards and checks.
+- **How it changes data:** Claude works Jirav's own screens (clicking, typing and saving through
+  Jirav's controls, so Jirav checks every value), and only after you approve each change. Imports go
+  through Jirav's own import cards and checks.
 - **Inside the tab:** to read Jirav's own Excel and PDF exports without a save dialog, the exports
   helper briefly intercepts the page's download calls (`URL.createObjectURL` and download-link clicks)
   for files Jirav creates, and restores them when released. To hand an import file to Jirav's upload
   code without the system file picker, the imports helper intercepts the file input's click once.
   Neither touches anything outside the Jirav tab.
-- **Stored in the browser:** a copy of the kit in the tab's `localStorage`, so it doesn't have to be
-  pasted again after a page reload. It is re-run from there only when its build matches the copy that
-  ships with the plugin; otherwise it's discarded and Claude pastes the current one.
+- **Stored in the browser:** a **file store** in the browser's private storage for app.jirav.com (OPFS), in a
+  folder per company: the import files Claude prepares or uploads (including the template fetched before
+  each import, the undo file), exports it reads, a log of each change it makes, and consolidation set-ups
+  and results. It stays in this browser only; you can ask Claude to list it, give you a copy, or delete it.
+- **Files to your computer:** only when you ask. Claude saves a file, or several as one zip, to your
+  Downloads folder, one download at a time, and your browser asks you to approve each one.
+- **Nothing fetched from elsewhere:** the kit loads no code or data from any other site. Where a workflow
+  needs outside data (exchange rates for a consolidation, say), Claude asks you for it or gives you a link
+  to download it yourself and drag in.
 
 ## Data and privacy
 
-- **Where data goes:** only to Jirav, in your own signed-in browser session.
+- **Where data goes:** changes go only to Jirav, in your own signed-in browser session. What Claude reads
+  through the kit (numbers, names, files) is part of your conversation with Claude, handled under your
+  Claude account's terms; the plugin sends it nowhere else.
 - **What it reads:** whatever your Jirav login can see, which can include personal data such as staff
   names and salaries, and Jirav users' names and emails.
 - **What it writes:** only the changes you approve (plan values, drivers, custom tables, imports). They
   are saved in your Jirav account and kept under your agreement with Jirav.
-- **What it stores:** nothing outside Jirav, apart from the kit copy in your browser described above.
+- **What it stores:** nothing outside Jirav and your own browser: the file store described above. Ask Claude to delete a company's files when you no longer need them.
 - **Privacy:** [Jirav Privacy Policy](https://www.jirav.com/privacy-policy).
 
 ## Support and license

@@ -29,7 +29,7 @@ await jirav.listReportSources()         // [{id, name, type, planId?, pointsTo?,
   tell the user instead of exporting blanks (if they still want the file, export it and say why it's
   empty), and offer to read the same numbers from the plan's own pages.
   `compareTo` includes its relative range, e.g. `Actuals (previous year)` or `Plan (year total)`; `percentOf` is the % column basis; `departments` is `all` or the
-  filtered list. `jirav.page().reportSlug` is the URL slug, not an id: match `listReports()` by name.
+  filtered list. `(await jirav.page()).reportSlug` is the URL slug, not an id: match `listReports()` by name.
   A source shown as `… (missing: deleted plan?)` means the page points at a plan that's gone: flag it.
 - **What a Δ means:** `variance.formula` gives each group's Δ per section, e.g. `revenue: {delta:
   'Actuals − 2026 Budget', percentOf: 'Actuals'}`, `expense: {delta: '2026 Budget − Actuals'}`.
@@ -47,7 +47,7 @@ await jirav.listReportSources()         // [{id, name, type, planId?, pointsTo?,
   (`<package> <Mon YY>`): skip test or scratch packages ("Test", "ZZ …", "… 1" clones), and say
   which you used. Publish names default to `<package> <Mon YY>` of
   the day it was published, so "Mar 26" often has February as its last actual month. Check
-  `jirav.getPeriods().closeMonth` and the last `actual` column.
+  `(await jirav.getPeriods()).closeMonth` and the last `actual` column.
 - **A published package's months are frozen** at publish time ("This Year" on a pack published in
   2025 still shows 2025). `getReportSetup` marks it `published: true` and leaves `rangeDates` empty
   (today's dates don't apply): read the months from the page (`readGridValues` → `periods`).
@@ -70,9 +70,11 @@ await jirav.listReportSources()         // [{id, name, type, planId?, pointsTo?,
 
 ## Change a package or page
 
-Adding pages, columns, comparisons, formats, rows, publishing, cloning and deleting:
-[report-editing.md](report-editing.md). Exports: [exports.md](exports.md).
+Creating, renaming and deleting packages; building one from chosen reports; adding, removing, renaming and
+reordering pages; columns, comparisons, variances, rows and format; publishing and cloning: one call per step with the
+`jirav.reports`, in [report-editing.md](report-editing.md). Exports: [exports.md](exports.md).
 
 ## Gotchas
 
-- IDs are per company; always list, never reuse IDs from another company.
+- IDs are per company; always list, never reuse IDs from another company. Page ids also change when a
+  package's pages are saved in Package Settings: find pages by name.
