@@ -188,7 +188,7 @@ Edit columns (`icon:view_column`), Edit rows (`icon:table_rows`), Package Settin
 | **Edit columns** | Report level: Department Filter, Show Notes, Show Footnote for "Partial Total", Show Account Codes (some page types have more toggles: by hand). **Each group's tab** has its own Column Headers (header rows, **Merge headers when possible**, **Show % Columns Of**: None, Revenue, COGS, OpEx, Net Income, Category, Sub Category, adding a % column after each value), then Primary Source, Comparison Source #1 / #2, Variance # / %. Group ⋮: Rename, Clone, Delete, Move. Sources don't include Goals (tiles can show goals) |
 | **Edit rows** | Depends on the template (below). Every template has Hide rows with zero amounts |
 | **Format** | Per row type (Row, Header, Sub Header, Total, Sub Total): font style, colours, alignment. Per number type (an Income Statement has Currency $ and Percent %): decimals, negatives, Display Scale, symbols, errors. Colours are by hand |
-| **Package Settings** | The pages as rows (name, type, ⋯ Add Report / Clone / Move / Delete), plus each page's Report Period and Column 1–3 Source / Period. To roll a whole package to a new month (by hand): tick pages, set a value in the top row, **Apply**, then **Save** |
+| **Package Settings** | The pages as rows (name, type, ⋯ Add Report / Clone / Move / Delete), plus each page's Report Period and Column 1–3 Source / Period: [below](#periods-and-sources-package-settings) |
 | Comments | Per page. The box (500 characters) → COMMENT posts at once. Only post when asked; @mentions were not tested and may notify |
 
 **By hand, for what the kit doesn't cover** (on the open page, after the yes for the whole change):
@@ -198,6 +198,46 @@ Edit columns (`icon:view_column`), Edit rows (`icon:table_rows`), Package Settin
 
 For example, Show % Columns Of is set in a group's tab, so each group has its own; `read()` shows it as that group's
 `percentOf`.
+
+### Periods and sources (Package Settings)
+
+Each page's Report Period, Column 1 Source (the Primary Source), Column 2 Source / Period (Comparison Source #1) and
+Column 3 Source / Period (Comparison Source #2), for many pages at once. One Save for the whole panel. After the yes for
+the whole change:
+
+- **`jirav.ui()` names them by column:** a page's controls are `[row: <page>]`: its tick `Select`, then the dropdowns
+  `Report Period`, `Column 1 Source`, `Column 2 Source`, `Column 2 Period`, `Column 3 Source`, `Column 3 Period`.
+  Above the pages, `[top row]` holds `Select all`, the same six dropdowns and `Apply`: they set every ticked page.
+  Pages without sources (cover, text, dashboard pages) show N/A and have no tick.
+- **Report Period opens the Ranges dialog**, not a list: choose with `jirav.pickers.range('<range>')` (its Save
+  only sets the dropdown). The other five are lists that close on a pick: click the option (`{kind: 'option', label: '<name>'}`).
+- **Column 2 / 3 Period** is relative to the Report Period: Current, Previous period, Previous year, Next Period, Next
+  Year, Year total, Year-to-date total. Choosing a Column 2 / 3 Source sets its period to Previous period: set the
+  period after the source. "Last year" for a comparison is Previous year.
+- Column 2 here is Edit columns' Comparison Source #1, and Column 3 its #2: for many pages, or when the user names
+  Package Settings, use this panel; for one page with its variances, `R.page.columns({compare})`.
+- The top row's dropdowns stay disabled until a page is ticked; **Apply** copies the top row's values to the ticked
+  pages and leaves the others as they were.
+
+Every page to one range, in one call (`R` is `jirav.reports`):
+
+```js
+await R.packages.open('<package>');
+await jirav.click({ label: 'icon:settings_applications' });
+await jirav.click({ label: 'Select all', where: 'top row' });
+await jirav.click({ kind: 'dropdown', label: 'Report Period', where: 'top row' });
+await jirav.pickers.range('Last Month');
+await jirav.click({ label: 'Apply', where: 'top row' });
+```
+
+One page: its own dropdowns, `{kind: 'dropdown', label: 'Column 2 Source', where: 'row: <page>'}`, then the option.
+`where` holds the first 40 characters of a page's name and matches a part of it: `'row: Executive Summary'` finds
+"Executive Summary - Cash, P&L, & Staffing" (unless another page starts the same).
+Then **Save** in its own call (`jirav.click({label: 'Save', kind: 'button'})`): Jirav closes the panel and reloads the
+package; wait for the panel to close (`await jirav.waitFor(async () => !(await jirav.ui({json: true})).some(o =>
+o.where === 'top row'))`) and check with `jirav.getReportSetup(<package id>)`: each page's `groups` show Column 1 as `source` and `range`,
+Column 2 as `compareTo` (`"Actuals (previous year)"`) and Column 3 as `thirdSource`. To leave without saving: the
+panel's **Cancel** (with changes Jirav asks "Unsaved changes": yes).
 
 **Edit rows by template:**
 

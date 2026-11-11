@@ -48,7 +48,7 @@ Runs on top of the `operating-jirav` skill: use its kit (`jirav.imports`, `readG
 The template's **Balance Sheet** sheet comes prefilled: each account holds the last actual balance, carried flat across every forecast month. Uploading it unchanged leaves the plan's Balance Sheet exactly as it was (verified, including System Cash, A/R and A/P).
 
 - **Default: leave the Balance Sheet sheet exactly as the template delivers it.** Don't edit it, and don't call `im.blankNumbers` on it.
-- **Template's Balance Sheet sheet is empty** (no numbers from row 6): the plan was already wiped. Stop, tell the user, and run the repair below before building the file.
+- **Template's Balance Sheet sheet is empty** (no numbers from row 6): the plan was already wiped. Stop, tell the user, and run the repair below before building the file. Unless the plan has no balances at all (its last actual month reads empty on the Assets, Liabilities and Equity pages): then leave the sheet as it is.
 - **The user supplies budgeted balances:** fill only those accounts and months, and leave every other cell prefilled. Balance Sheet lines in the file are **not** by themselves a request to load them: ask (Questions, item 9). Never fill Cash or System lines (System Cash, A/R, A/P): Jirav calculates them.
 - **Never blank Balance Sheet cells.** Blank cells are imported as **0**. Every non-cash account (bank sub-accounts, AR, inventory, fixed assets, liabilities, equity) then drops to zero for the whole forecast, and System Cash absorbs the difference.
 - Always fetch a **fresh** template right before building, because the prefilled balances reflect the latest actuals.

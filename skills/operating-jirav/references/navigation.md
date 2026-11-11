@@ -47,7 +47,7 @@ These need a full path — the short form **redirects to the dashboard**:
 
 | Menu | URL |
 |---|---|
-| Chart of Accounts | `/setup/coa/is/revenue` (income statement), `/setup/coa/bs/assets` (balance sheet) |
+| Chart of Accounts | `/setup/coa/is/revenue`, `/is/cogs-opex`, `/is/other`, `/bs/assets`, `/bs/liabilities`, `/bs/equity` ([chart-of-accounts.md](chart-of-accounts.md)) |
 | Custom Tables | `/setup/custom-tables/<encoded name>` — open via Settings menu once, copy the path |
 | Assumptions | `/setup/assumptions/` (trailing slash required) or `/setup/assumptions/<name-with-dashes>`; values are in the plan page's Assumptions panel |
 
@@ -78,11 +78,11 @@ hand-written selectors.
   Tile Builder is a `button` named by its type ("Vertical Bar", `= selected` once chosen). A tick box in a
   settings row (Dashboard Settings) is a `checkbox` named by its row's name.
 - `where`: `dialog: <title>` (`dialog: driver` for the Add Driver form), `menu`, `row: <name>` for a grid
-  row's controls, `formula: <row>` for the formula bar's icons (only once it has loaded that row's driver).
+  row's controls (and a Chart of Accounts / Departments row's), `chip: <name>` for a chip's × in those rows, `top row` for the row above Package Settings' pages that sets every ticked one, `formula: <row>` for the formula bar's icons (only once it has loaded that row's driver).
 - Points are in screenshot coordinates. `(covered)`: something is on top; `(disabled)`; `(off screen)`
   only with `offscreen: true` (below the fold, say). `within: 'menu'` / `'dialog'` keeps one part;
   `json: true` returns objects. Dialog and menu controls come first.
-- A `ref` stays the same control across calls; once that control leaves the page, using it fails with
+- A `ref` is the number `ui()` prints, passed bare (`jirav.click(111)`, not `{ref: 111}`); it stays the same control across calls; once that control leaves the page, using it fails with
   `stale: run jirav.ui() again`.
 
 **Queries.** Each helper below takes a ref, an element, or a query

@@ -82,7 +82,7 @@ could (visible, on top, enabled; typed and read back). Anything that saves runs 
   ask, and never put a failure down to it: the user hears what you did, saw or couldn't do in Jirav, in Jirav's own
   words.
 - **Narrow panes** (Cowork's runs about 400–1000 px wide): the helpers make room and scroll themselves,
-  view-only. **Never ask the user to resize the pane.** A result with `offscreen: true` gives no point:
+  view-only. **Work at whatever pane width you get.** A result with `offscreen: true` gives no point:
   follow its `reason`, retry. Kit points (`ui()`, `jirav.at(el)`, `cellPoint`) are in screenshot
   coordinates (the screenshot is always 800 wide); if the screenshot tool reports another width, set
   `jirav.frame.width` to it. Take a point just before its click: scrolling moves the others.
@@ -102,6 +102,8 @@ Read the screen with the kit instead of screenshots, and act on it by label ([na
   call that changes something (`add`, `set`, `save`, `remove`, an upload, Save) gets a browser call of its own.
   Each fits one and checks first whether its change is already there, so making it again does nothing twice.
   `jirav.log` changes nothing in Jirav and is quick: it goes in the same call as the read that verifies the change.
+  On a page that holds edits until its SAVE CHANGES (Chart of Accounts, Departments, custom table structure),
+  the clicks that stage them can share a call; SAVE gets its own.
   - A result with **`call`** isn't finished: make that call next, as written. `pending: true`: Jirav is
     still working (saving, loading, rebuilding): the call waits first, then does only what's left (a
     `set`'s values already in place are skipped). `more`: what a write didn't reach yet; the call does it.

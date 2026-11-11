@@ -37,7 +37,7 @@ the rest of the session.
 | `skill` | `operating-jirav`, or the level-2 skill that asked for the change |
 | `company` | Tenant short name |
 | `plan` | Plan name, or empty for company-wide objects |
-| `object_type` | `plan-values`, `plan-driver`, `global-driver`, `assumption`, `custom-table`, `staffing`, `report`, `dashboard`, `setting`, `import`, … |
+| `object_type` | `plan-values`, `plan-driver`, `global-driver`, `assumption`, `custom-table`, `staffing`, `report`, `dashboard`, `setting`, `chart-of-accounts`, `departments`, `import`, … |
 | `object` | What was changed, by its visible label (line, driver, page, tile, setting) |
 | `department` | Department, or `All` |
 | `periods` | `Jan-27..Dec-27`, a single month, or empty |

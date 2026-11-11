@@ -204,14 +204,14 @@ driver doesn't make the Manual Input row read-only, so `set`'s `readOnly` doesn'
 
 The forecast months: `(await jirav.getPeriods(planId)).plan.forecast` → `[first, last]` (`YYYY-MM`).
 
-On **Plan > Revenue, COGS, OpEx or Other**, use `jirav.gridEntry`
+On **Plan > Revenue, COGS, OpEx or Other** and a plan's **custom table** pages ([custom-table-values.md](custom-table-values.md)), use `jirav.gridEntry`
 (`(await jirav.page()).blocks` names it there). It types a row's months through the grid's own editor in one call, reads each
 one back, and saves only when you call `save()`:
 
 ```js
 const E = jirav.gridEntry;
 await E.ready()                       // after the page opens: waits for the grid's rows
-E.read(account, department, months?, parent?)
+await E.read(account, department, months?, parent?)
   // -> {row, values: {'YYYY-MM': number | null}, staged: [month]}; null = no value that month; row null + why when
   //    this view has no input row for it (e.g. a department with no values)
 await E.set({account, department, values: {'YYYY-MM': number | ''}, parent?})

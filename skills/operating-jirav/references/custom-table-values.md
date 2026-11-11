@@ -6,17 +6,20 @@ company-wide in [custom-table-structure.md](custom-table-structure.md). Lines ca
 by [plan drivers](plan-drivers.md) or [global drivers](global-drivers.md); those rows are
 read-only. Find tables with `await jirav.listCustomTables()` → `[{id: "custom-xxxxxx", name}]`.
 
-1. Open the table in the plan.
-2. Check editability: `jirav.readGridValues({ editable: true })`. Actual months are read-only, and
-   typing there **fails silently** (no editor opens, nothing changes, no message): check first.
-3. Click a cell + **Enter** (or double-click) → type → **Enter**. **Tab** also commits and opens the
-   next month, so a row can be typed in one pass. Point:
-   `jirav.readGridValues.cellPoint('<line>', 'YYYY-MM')`. To **clear** a value: click it, press
-   **Delete**; it reads 0 until SAVE, then blank. Don't report that 0 as a typed value.
-4. **SAVE** in the bottom bar (CANCEL discards all pending edits). Line totals and drivers update
-   only after SAVE. A reload or navigation before SAVE **drops the edits** (a person may get a
-   "Leave site?" prompt; automation doesn't): before leaving, check `(await jirav.saveBar()).pending` is
-   false. Reload and re-read to verify.
+Type values with `jirav.gridEntry` (as on the account grids, [plans.md](plans.md)): on a custom table page
+`account` is the line's name and there's no department.
+
+```js
+await jirav.go('/<tenant>/plan/x/<planId>/custom/<customTableId>')
+const E = jirav.gridEntry; await E.ready()
+await E.read('<line>', undefined, ['2026-07'])                     // -> {values: {'2026-07': number | null}}
+await E.set({account: '<line>', values: {'2026-07': 5}})           // staged and read back; '' clears; never saves
+await E.save()                                                     // after the user's yes: SAVE, then reads them back
+```
+
+Actual and driven months come back in `readOnly`, a line with no typed months as a failed month with its `why`.
+Line totals and drivers update only after SAVE; `E.cancel()` drops what's staged. A clear shows in `staged` as
+`value: 0` with the month in `cleared` (Jirav holds 0 until SAVE): it saves as empty, and `save()` reads it back so.
 
 A section with a Subtotal shows its total on the section row itself (there's no separate Subtotal
 row in the plan): `readGridValues` gives it as that row's values, kind `total`.
@@ -30,8 +33,8 @@ Auto-Forecast doesn't change custom-table values (verified).
   `readGridValues` returns percents as fractions (0.15 = 15%): multiply by 100 before typing a
   value you read.
 - **Driven lines:** the line's own row is read-only; under it is an input row with the **same
-  name**. Type there: `cellPoint('<line>', 'YYYY-MM', {index: 1})` (without `index` it throws
-  "2 rows are labelled"). Input **adds** to the driver (driver 2,923 + typed 500 = 3,423). For a
+  name**. Type there with `parent` naming the line: `E.set({account: '<line>', parent: '<line>', values})`
+  (without it, set says "2 rows are labelled" and lists them). Input **adds** to the driver (driver 2,923 + typed 500 = 3,423). For a
   target total, type target − driver, or change the driver; say which you did.
 - **Linked lines:** a line used by other lines' drivers (funnels, "LM" = last month) moves them
   too, in later months as well. After SAVE, re-read the lines that depend on it and report what

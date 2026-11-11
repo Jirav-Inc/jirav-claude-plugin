@@ -24,7 +24,8 @@ Columns: MASTER, the accounting system (e.g. QUICKBOOKS), WORKFORCE; header show
 |---|---|
 | MASTER ⋯ | Add Department, Add from Accounting |
 | Department ⋯ | Add Department, Move, **Make Sub** (nests it under the department above; not on the first one), Delete |
-| Chip × | Unmaps that source department |
+| Chip × | Unmaps that source department: it goes back to **Unassigned** by itself |
+| Click a row's ACCOUNTING or WORKFORCE field | Picker of the source departments in no other master (Unassigned ones included): pick one to move it |
 
 Edits are batched behind SAVE CHANGES (as in Chart of Accounts); verified: MASTER ⋯ → Add Department
 adds "New Department" at the bottom (rename it in place) → SAVE CHANGES; its ⋯ → **Delete removes
@@ -32,4 +33,9 @@ it with no confirmation** (still pending until SAVE CHANGES; Cancel undoes it). 
 company-wide: confirm before saving, and check `listDepartments()` after.
 **Names must be unique:** a duplicate turns both rows red and disables SAVE (`jirav.saveBar()`
 returns `blocked`). `getLimits().departments` → caps and `used: {total, top}` (Unassigned not counted, as in the header).
-Menus here don't close with Escape: click empty space.
+Menus and pickers here don't close with Escape: `await jirav.close()`. The name field is `field "Master ..."`
+(query it by `where: 'row: <name>'`); the MASTER header's ⋯ is the `icon:more` with no row. In `jirav.ui()` a row's controls carry `[row: <master>]`
+and each chip's × is `icon:close [chip: <name>]`, as in [chart-of-accounts.md](chart-of-accounts.md): moving
+Product to another master is `jirav.click({label: 'close', where: 'chip: Product'})`, then
+`jirav.click({kind: 'picker', label: 'Workforce', where: 'row: <master>'})` and the option (the accounting
+picker is named by the accounting system).

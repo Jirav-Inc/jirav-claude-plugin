@@ -6,8 +6,9 @@ and only on request.
 
 Read every tab at once with `await jirav.getCompanySettings()` → `{general, accounting: {fiscalYearStart,
 currency, method, retainedEarnings, closeMonth, import, importAgingDetail}, plans: {salaryExpenses, cash},
-staffing: {countLeaversInTerminationMonth, prorateSalaries, averageHoursPerWeek}, labels: [{standard, label, changed}]}`
-(the values sit in shadow DOM on the page).
+staffing: {countLeaversInTerminationMonth, prorateSalaries, averageHoursPerWeek}, labels: [{standard, label, changed}]}`.
+It reads the **saved** values from Jirav, not the screen: before Save it still shows the old value, so after Save it
+is the check.
 
 | Tab | Settings |
 |---|---|
@@ -16,6 +17,19 @@ staffing: {countLeaversInTerminationMonth, prorateSalaries, averageHoursPerWeek}
 | Plans | Salary Expenses account (where staffing salaries post, e.g. *Salaries and Wages*; often not set, and then staffing never reaches OpEx: [staffing.md](staffing.md#gotchas); the list has no empty option), Cash account, and "Remove Unmapped category from all reports and plans" |
 | Staffing | Count terminated employees in headcount for their termination month (on/off), Prorate salaries (on/off), average hours per week for hourly staff |
 | Labels | Rename the standard statement labels (Revenue, COGS, Gross Margin, …). A label shows in the plan sidebar and page titles, but **plan grid rows keep the standard name** ("Revenue"), and so does `readGridValues`. **RESTORE DEFAULT LABELS applies at once, with no confirmation and no Save**: read the current labels first and say which custom ones it will wipe |
+
+**Changing a Plans or Staffing setting** (after the user's yes), by the controls' labels on the tab
+(`/<tenant>/setup/company/plans` or `/staffing`):
+
+```js
+await jirav.fill({label: 'Average hours per week for hourly employees'}, '37.5')       // Staffing
+await jirav.click({label: 'Salary Expenses', kind: 'dropdown'})                          // Plans (or 'Cash')
+await jirav.click({label: 'Salaries and Wages', kind: 'option'})                         // the account, by its name
+await (await jirav.saveBar()).press()                                                    // the tab's Save
+await jirav.getCompanySettings()                                                         // the check
+```
+
+The Salary Expenses list isn't payroll only (it also has Depreciation, Insurance…): pick the account the user names.
 
 **Close month** drives "Close Month" date ranges and is what `(await jirav.getPeriods()).closeMonth`
 returns. `getPeriods()` also gives `closeMonthSource`:

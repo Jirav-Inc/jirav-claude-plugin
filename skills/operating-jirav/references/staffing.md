@@ -94,7 +94,7 @@ say so, with the numbers.
 ## Gotchas
 
 - **Put a hire in a forecast month: check it yourself.** Jirav saves a Hire Date in an actual month
-  with no warning (SAVE stays enabled; the date picker only greys out days before today). The
+  silently (SAVE stays enabled; the date picker only greys out days before today). The
   Staffing grids then count the person from that month, actuals included, while the P&L's actual
   months stay as imported, so the two disagree. Compare the date with the plan's cutover
   (`getPeriods(planId)`) before typing it. If the user gives a start date that's already in actuals

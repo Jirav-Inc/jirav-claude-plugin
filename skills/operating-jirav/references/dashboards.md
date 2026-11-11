@@ -39,7 +39,7 @@ comes back as plain text in `listDashboardTiles(...).text` and `getTileValues` �
 |---|---|
 | Dashboard name ▾ → **MANAGE DASHBOARDS** | List (max 50), drag ⠿ to reorder, rename in the field; row ⋮ → Add / Clone (named "<name>_1") / Delete |
 | **Actions → Add New** | Tile, Text Tile, Income Statement Tile, Balance Sheet Tile |
-| Tile ⋯ | Edit, Clone, Delete, Export (PNG / PDF / SVG / CSV: [exports.md](exports.md)), Full Screen |
+| Tile ⋯ | Edit, Clone, Delete, Export (PNG / PDF / SVG / CSV: [exports.md](exports.md)), Full Screen. Open one item with `await jirav.dashboards.tiles.menu(tile, item)` (tile by title or `{id}`) |
 | Right rail ⚙ | **Dashboard Settings**: one row per chart tile (Name, Source, Compared to, Periodicity) and a bulk bar for many tiles; one Save |
 | **Share & Export → Share** | Shares the dashboard with people or groups by name or email and **emails them**. Only when the user asks, naming who; confirm before Done. Not tested: adding a person may send at once, before Done. Never type into the field to explore |
 | **Share & Export → Export as PDF** | See [exports.md](exports.md) |

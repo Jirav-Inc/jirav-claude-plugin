@@ -36,7 +36,7 @@ await jirav.listReportSources()         // [{id, name, type, planId?, pointsTo?,
   Revenue rows are Revenue, margins and income lines; everything else is expense. The formula can
   differ between sections and between groups on one page (one BvA page had expense Δ = Budget −
   Actuals for the month and Actuals − Budget for YTD). Say which way a Δ runs before calling it
-  over or under, and never judge from the sign or colour alone
+  over or under, and don't rely on the sign or colour alone
   ([variance-and-cash-flow-settings.md](variance-and-cash-flow-settings.md)).
 - Values: open the page and use `jirav.readGridValues()`. Columns carry `columnSources`
   (Actuals vs plan); Δ, % and "% of" columns have kinds `variance`, `variancePercent`,

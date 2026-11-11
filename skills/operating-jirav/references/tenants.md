@@ -21,7 +21,7 @@ Each entry:
 
 - Match the user's words against `fullName`, case-insensitive, partial is fine. If more than one
   matches, ask which.
-- API base for all per-company calls = `` `${apiServerURI}/${tenantId}` `` — **`tenantId`, not
+- API base for all per-company calls = `apiServerURI + "/" + tenantId` — **`tenantId`, not
   `shortName`**. They're the same for some companies and different for others, so using
   `shortName` works on one company and 404s on the next. `jirav.getTenant(name)` returns
   `{fullName, shortName, tenantId, base}`.

@@ -28,13 +28,13 @@ matches, a plan page with the Department filter, or `readGridValues`. State the 
 
 | From | Click | File caught |
 |---|---|---|
-| One report page | Page title ⋮ → **Export as Excel** | `<Page>.xlsx`, one sheet |
+| One report page | Page title ⋮ (`icon:more`, a button) → **Export as Excel** | `<Page>.xlsx`, one sheet |
 | Whole package | **Share & Export → Export as Excel** | `<Package>.xlsx`, one sheet per page (Index first). **Dashboard pages are left out**, and `/` in a page name becomes `_` ("A_R Aging Summary"): match sheets to pages that way |
 | Whole package | **Share & Export → Export as PDF** → preview → **EXPORT** → *Select Reports for Download* (tick pages) → **Download** | `<Package>.pdf` |
-| One report page as PDF | The page title ⋮ has no PDF: **Share & Export → Export as PDF** → **EXPORT** → *Select Reports for Download* opens with **every page ticked** (its header box can show unticked: its first click ticks all, the second clears) → tick that page → **Download** | `<Package>.pdf`, named after the package, holding that page |
+| One report page as PDF | The page title ⋮ has no PDF: **Share & Export → Export as PDF** → **EXPORT** → *Select Reports for Download* opens with **every page ticked** (its header box can show unticked: its first click ticks all, the second clears) → tick that page → **Download**. The boxes have no labels: `jirav.click({kind: 'checkbox', where: 'Select Reports for Download', nth: n})`, the header box `nth: 0`, then the pages in the package's order (`listReportPages`) from 1. Wait for the preview's **Export** button before clicking it (labels match whatever their case) | `<Package>.pdf`, named after the package, holding that page |
 | Dashboard | **Share & Export → Export as PDF** → preview → **EXPORT** | `<Dashboard>.pdf` |
 | A plan grid | Right-click a cell → **Export** → CSV Export / **Excel Export** | `<Page>.xlsx` (e.g. `Operating Expenses.xlsx`, 11 KB) |
-| One dashboard tile | Tile ⋯ → **Export** (click, it doesn't open on hover) → PNG / PDF / SVG / **CSV** | `<Tile>.csv`: `Time Period` + one column per series, UTF-8 with BOM |
+| One dashboard tile | `await jirav.dashboards.tiles.menu('<tile title>', 'Export')` (the tile's ⋯ → Export; `items` lists the formats), then `await jirav.click({label: 'Comma Separated Values (.csv)'})` (or the PNG / PDF / SVG item) | `<Tile>.csv`: `Time Period` + one column per series, UTF-8 with BOM. **A month with no data is 0 in the CSV** (`getTileValues` gives null): don't report it as a value |
 
 Wait for it with `const f = await jirav.exports.wait()` (a package PDF takes up to ~15 s). It returns only a
 file it hasn't returned before. `{timedOut: true}` means **no new file**: don't read anything, check the
@@ -42,7 +42,7 @@ Export and do it again; until a `wait()` succeeds, reads without an index refuse
 index, `readXlsx(f.i)`. Then:
 
 ```js
-jirav.exports.list()   // [{i, name, size, type, at}], newest last
+await jirav.exports.list()   // [{i, name, size, type, at, path, saved}], newest last
 ```
 
 Don't use:
@@ -56,7 +56,9 @@ Don't use:
 ```js
 await jirav.exports.readXlsx(f.i)                   // {name, sheets: [{name, rows, formulaCells}]}
 await jirav.exports.readXlsx(i, {formulas: 'text'}) // formulas as "=…" instead of values
-// CSV: atob((await jirav.exports.readBase64(i)).base64), strip the leading BOM
+// CSV: new TextDecoder().decode(Uint8Array.from(atob((await jirav.exports.readBase64(i)).base64), c => c.charCodeAt(0)))  (UTF-8, BOM dropped)
+// readBase64 reads 150 KB at a time: {offset (bytes), length, done}; next chunk at offset + length
+// a PDF's page count, in place: (atob((await jirav.exports.readBase64(i)).base64).match(/\/Type\s*\/Page[^s]/g) || []).length
 ```
 
 - **Subtotals and totals are formulas** (`SUBTOTAL(9,B10:B12)`) with no stored result, so other
