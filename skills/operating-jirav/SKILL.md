@@ -146,7 +146,7 @@ Facts marked *(help)* come from Jirav's help articles and haven't been tested: c
 | Import from Excel: budgets, staff list, custom-table actuals | `imports.md` |
 | Adding a month of GL actuals ("add October"), any source; GL actuals from Excel (JiravExcel) | `excel-actuals.md` (checks the source and `actualsThrough` first) |
 | Where actuals come from, last sync, close month | `integrations.md` |
-| Settings: company (close month, fiscal year, labels) / goals / variance rules and cash flow / users, roles, Audit Log | `company-settings.md` / `goals.md` / `variance-and-cash-flow-settings.md` / `users-and-audit-log.md` |
+| Settings: company (close month, fiscal year, labels) / goals / variance rules and cash flow / users, user groups, roles, plan sharing, Audit Log | `company-settings.md` / `goals.md` / `variance-and-cash-flow-settings.md` / `users-and-audit-log.md` |
 | Chart of Accounts / Departments / Date ranges / Auto-Forecast method | `chart-of-accounts.md` / `departments.md` / `date-ranges.md` / `forecast-settings.md` |
 | Logging every edit (`jirav.log`, a CSV per day in the file store) | `build-log.md` |
 | Files kept across reloads: imports, exports, the build log; exporting a copy | `file-store.md` |

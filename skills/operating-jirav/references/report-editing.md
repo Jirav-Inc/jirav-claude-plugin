@@ -235,8 +235,11 @@ One page: its own dropdowns, `{kind: 'dropdown', label: 'Column 2 Source', where
 "Executive Summary - Cash, P&L, & Staffing" (unless another page starts the same).
 Then **Save** in its own call (`jirav.click({label: 'Save', kind: 'button'})`): Jirav closes the panel and reloads the
 package; wait for the panel to close (`await jirav.waitFor(async () => !(await jirav.ui({json: true})).some(o =>
-o.where === 'top row'))`) and check with `jirav.getReportSetup(<package id>)`: each page's `groups` show Column 1 as `source` and `range`,
-Column 2 as `compareTo` (`"Actuals (previous year)"`) and Column 3 as `thirdSource`. To leave without saving: the
+o.where === 'top row'))`) and check with `jirav.getReportSetup(<package id>)` (an array, one entry per page): each page's
+`groups` show Column 1 as `source` and `range`, Column 2 as `compareTo` (`"Actuals (previous year)"`) and Column 3 as
+`thirdSource`. After a period change, check each source plan covers the new range (`jirav.getPeriods(planId)`): a
+plan whose months end before it leaves that page empty, which is worth telling the user. After **Apply** the top
+row's dropdowns read "Select value" again; the pages' own rows show what was applied. To leave without saving: the
 panel's **Cancel** (with changes Jirav asks "Unsaved changes": yes).
 
 **Edit rows by template:**

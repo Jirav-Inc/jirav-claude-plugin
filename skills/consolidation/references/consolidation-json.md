@@ -16,7 +16,6 @@ it back. It is the same object `cs.group()` returns. Version: `"schema": "jirav-
 | `coa` | the consolidated chart: `[{id, parent, name, cls, cat, fn}]` (`cls` Asset / Liability / Equity / Revenue / Expense; `cat` a Jirav category) |
 | `mapping` | `{entity code: {account id: consolidated id}}`: every account of every entity |
 | `eliminations` | `[{name, lines: [{entity, account}], confirmed}]` |
-| `fx` | `source`, `euro` (ECB rates by month and currency, against the euro), `overrides` (the user's own rates: `{currency: {month: {avg, close}}}`, reporting-currency units per 1 unit), `historicalRates` |
 | `draft` | true until the user confirms the set-up; `run` refuses a draft |
 | `review` | the proposal's notes (informational) |
 

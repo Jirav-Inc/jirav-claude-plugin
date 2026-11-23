@@ -22,7 +22,8 @@ asked for (`M`) must have ended; if it hasn't, say so and ask before going on. T
 
 Also flag the close month now: an `Accounting system` close month with `accountingCloseMonth: null` (it
 reads the **current month**) means the last file had no **Company Setup** tab: the close month fell back
-and is effectively unknown. Imported actuals for `M` show in reports with an Actual column, not in a
+and is effectively unknown. A file that carries one (the consolidation skill's import does) sets the close month to
+its last month. Imported actuals for `M` show in reports with an Actual column, not in a
 plan's `M` column until the plan's actuals period is rolled (month-end close).
 
 ## 1. The file

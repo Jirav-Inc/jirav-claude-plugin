@@ -14,6 +14,28 @@ Roles: Admin, Editor, Viewer: All, Viewer: Dashboard & Reports, Viewer: Dashboar
 **ADD USER sends an invitation email, and the Role dropdown on a row changes that person's access
 at once.** Only when the user asks, naming the person and role. Not tested.
 
+## Groups (`/<tenant>/setup/access-config/groups`)
+
+```js
+await jirav.listGroups()   // [{id, name, members: [email], builtIn}]; All Users is built in: everyone, automatically
+```
+
+- **Add Group** (two buttons, above and below the list: either, `{label: 'Add Group', nth: 0}`) adds a row named
+  "New Group": its name is `field "Group" [row: New Group]` (`jirav.fill` it; renaming a group is the same fill, and
+  the row is then `row: <new name>`), its members `picker "Users" [row: <group>]`: click it, then the person's
+  `option` (the list has a Search field), then `jirav.close()`.
+- A group's ⋯ → **Remove Group** → Jirav's "Remove Group" question → **Remove**.
+- Every change waits for **SAVE** in the bottom bar (`jirav.saveBar()`; `press()` in a call of its own), the removal
+  too; Cancel discards. Check with `listGroups()`.
+
+## Sharing a plan
+
+A plan's **Share** (top right) → **Share** shares it with **people** (not groups): who, a name for the shared copy
+(2–24 characters), a message, which part (Full / Restrict By Department / Custom Plan Access) and **Edit** or
+**Comment Only** (there is no view-only level). **Manage Plan Sharing** lists what was shared
+(`/plan/<slug>/<planId>/sharing-history`). Cancel on the Share form asks "Leaving share plan" (Leave closes it).
+Sharing sends the person access at once: only when the user asks, naming the person.
+
 ## Audit Log (`/<tenant>/setup/audit-log`)
 
 Who changed what, when: answers "who changed this plan / table?". Read it with the kit, not the page:

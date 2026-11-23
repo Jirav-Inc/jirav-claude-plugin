@@ -34,8 +34,16 @@ Sheet (Assets, Liabilities, Equity, All BS Sections), All Sections; the names fo
 labels, so go by the URL. Each row: the master's name (`field "Master"`) on the left, its mapped source
 accounts as chips (`picker`, named by the accounting system) on the right.
 
-In `jirav.ui()` every row's controls carry `[row: <master>]` and each chip's × is
-`icon:close [chip: <source account>]`. The section title's ⋯ is the `icon:more` with no row.
+In `jirav.ui()` every row's controls carry `[row: <master>, section: <section>]` (each section has its own
+**Unmapped** row: name the section, `where: 'row: Unmapped, section: OpEx'`) and each chip's × is
+`icon:close [chip: <source account>]`. The section title's ⋯ is the `icon:more` with no row. A picker's value
+lists all its chips.
+
+The page fills in after it opens: wait for its rows before reading
+(`await jirav.waitFor(async () => (await jirav.ui({json: true, offscreen: true})).some(o => /^row: /.test(o.where || '')))`).
+Rows below the window aren't in `ui()`'s list (its last line says how many are off screen); `click` and `fill` reach
+them by query, `jirav.ui({offscreen: true})` lists them, and `jirav.scrollTo({where: 'row: Rent'})` brings one into
+view. For what's mapped where, `jirav.getChartOfAccounts()` is quicker than reading the screen.
 
 ```js
 await jirav.click({label: 'more', where: 'row: Depreciation'})     // a master's ⋯
@@ -56,7 +64,8 @@ the option by query straight away (a query also looks below the fold).
 | Click the right-hand field | Picker of this section's source accounts that sit in no other real master, those in **Unmapped** included: picking one moves it off Unmapped. One mapped to another master: unmap it there first |
 | The **Unmapped** row | Greyed: no name to edit, its chips have no ×. Map an account onto a real master to move it |
 
-Edits are batched: **SAVE CHANGES** at the bottom stores them, **Cancel** discards. Verified on a test
+Edits are batched: **SAVE CHANGES** at the bottom stores them (`await (await jirav.saveBar()).press()`, in a browser
+call of its own), **Cancel** discards. Check a save with `jirav.getChartOfAccounts()`. Verified on a test
 company (one section switched to manual, a master added, a source account moved onto it, then switched
 back):
 - **Manage manually** → SAVE turns each mirrored account into a master with its source account as a
